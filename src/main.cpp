@@ -36,6 +36,7 @@
 #include "components/datetime/DateTimeController.h"
 #include "components/heartrate/HeartRateController.h"
 #include "components/stopwatch/StopWatchController.h"
+#include "components/timer/Timer.h"
 #include "components/fs/FS.h"
 #include "drivers/Spi.h"
 #include "drivers/SpiMaster.h"
@@ -107,6 +108,7 @@ Pinetime::Controllers::NotificationManager notificationManager;
 Pinetime::Controllers::MotionController motionController;
 Pinetime::Controllers::StopWatchController stopWatchController;
 Pinetime::Controllers::AlarmController alarmController {dateTimeController, fs};
+Pinetime::Controllers::Timer timerController;
 Pinetime::Controllers::TouchHandler touchHandler;
 Pinetime::Controllers::ButtonHandler buttonHandler;
 Pinetime::Controllers::BrightnessController brightnessController {};
@@ -127,7 +129,8 @@ Pinetime::Applications::DisplayApp displayApp(lcd,
                                               brightnessController,
                                               touchHandler,
                                               fs,
-                                              spiNorFlash);
+                                              spiNorFlash,
+                                              timerController);
 
 Pinetime::System::SystemTask systemTask(spi,
                                         spiNorFlash,

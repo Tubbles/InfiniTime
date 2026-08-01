@@ -91,7 +91,8 @@ DisplayApp::DisplayApp(Drivers::St7789& lcd,
                        Pinetime::Controllers::BrightnessController& brightnessController,
                        Pinetime::Controllers::TouchHandler& touchHandler,
                        Pinetime::Controllers::FS& filesystem,
-                       Pinetime::Drivers::SpiNorFlash& spiNorFlash)
+                       Pinetime::Drivers::SpiNorFlash& spiNorFlash,
+                       Pinetime::Controllers::Timer& timerController)
   : lcd {lcd},
     touchPanel {touchPanel},
     batteryController {batteryController},
@@ -110,7 +111,7 @@ DisplayApp::DisplayApp(Drivers::St7789& lcd,
     filesystem {filesystem},
     spiNorFlash {spiNorFlash},
     lvgl {lcd, filesystem},
-    timer(this, TimerCallback),
+    timerController {timerController},
     controllers {batteryController,
                  bleController,
                  dateTimeController,
@@ -124,12 +125,13 @@ DisplayApp::DisplayApp(Drivers::St7789& lcd,
                  brightnessController,
                  nullptr,
                  filesystem,
-                 timer,
+                 timerController,
                  nullptr,
                  this,
                  lvgl,
                  nullptr,
                  nullptr} {
+  timerController.Init(this, TimerCallback);
 }
 
 void DisplayApp::Start(System::BootErrors error) {

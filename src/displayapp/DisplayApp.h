@@ -69,7 +69,8 @@ namespace Pinetime {
                  Pinetime::Controllers::BrightnessController& brightnessController,
                  Pinetime::Controllers::TouchHandler& touchHandler,
                  Pinetime::Controllers::FS& filesystem,
-                 Pinetime::Drivers::SpiNorFlash& spiNorFlash);
+                 Pinetime::Drivers::SpiNorFlash& spiNorFlash,
+                 Pinetime::Controllers::Timer& timerController);
       void Start(System::BootErrors error);
       void PushMessage(Display::Messages msg);
 
@@ -104,7 +105,7 @@ namespace Pinetime {
 
       Pinetime::Controllers::FirmwareValidator validator;
       Pinetime::Components::LittleVgl lvgl;
-      Pinetime::Controllers::Timer timer;
+      Pinetime::Controllers::Timer& timerController;
 
       AppControllers controllers;
       TaskHandle_t taskHandle;

@@ -15,7 +15,9 @@ namespace Pinetime {
         bool expired;
       };
 
-      Timer(void* timerData, TimerCallbackFunction_t timerCallbackFunction);
+      Timer() = default;
+
+      void Init(void* timerData, TimerCallbackFunction_t timerCallbackFunction);
 
       void StartTimer(std::chrono::milliseconds duration);
 
@@ -28,7 +30,7 @@ namespace Pinetime {
       void ResetExpiredTime();
 
     private:
-      TimerHandle_t timer;
+      TimerHandle_t timer = nullptr;
       TickType_t expiry;
       bool triggered = false;
     };
