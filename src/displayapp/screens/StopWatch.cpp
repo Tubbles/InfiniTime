@@ -1,4 +1,5 @@
 #include "displayapp/screens/StopWatch.h"
+#include "components/ble/ClockSyncService.h"
 
 #include "displayapp/screens/Symbols.h"
 #include "displayapp/InfiniTimeTheme.h"
@@ -35,8 +36,8 @@ namespace {
   constexpr TickType_t blinkInterval = pdMS_TO_TICKS(1000);
 }
 
-StopWatch::StopWatch(System::SystemTask& systemTask, StopWatchController& stopWatchController)
-  : wakeLock(systemTask), stopWatchController {stopWatchController} {
+StopWatch::StopWatch(System::SystemTask& systemTask, StopWatchController& stopWatchController, ClockSyncService* clockSyncService)
+  : wakeLock(systemTask), stopWatchController {stopWatchController}, clockSyncService {clockSyncService} {
   static constexpr uint8_t btnWidth = 115;
   static constexpr uint8_t btnHeight = 80;
   btnPlayPause = lv_btn_create(lv_scr_act(), nullptr);
@@ -230,6 +231,9 @@ void StopWatch::PlayPauseBtnEventHandler() {
   } else if (stopWatchController.IsRunning()) {
     OnPause();
   }
+  if (clockSyncService != nullptr) {
+    clockSyncService->NotifyStopWatch();
+  }
 }
 
 void StopWatch::StopLapBtnEventHandler() {
@@ -240,6 +244,9 @@ void StopWatch::StopLapBtnEventHandler() {
     stopWatchController.Clear();
     DisplayCleared();
     wakeLock.Release();
+  }
+  if (clockSyncService != nullptr) {
+    clockSyncService->NotifyStopWatch();
   }
 }
 

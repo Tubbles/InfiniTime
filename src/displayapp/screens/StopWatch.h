@@ -22,7 +22,9 @@ namespace Pinetime::Applications {
 
     class StopWatch : public Screen {
     public:
-      explicit StopWatch(System::SystemTask& systemTask, Controllers::StopWatchController& stopWatchController);
+      StopWatch(System::SystemTask& systemTask,
+                Controllers::StopWatchController& stopWatchController,
+                Controllers::ClockSyncService* clockSyncService);
       ~StopWatch() override;
       void Refresh() override;
 
@@ -44,6 +46,7 @@ namespace Pinetime::Applications {
 
       Pinetime::System::WakeLock wakeLock;
       Controllers::StopWatchController& stopWatchController;
+      Controllers::ClockSyncService* clockSyncService;
       TickType_t lastBlinkTime = 0;
       uint8_t displayedLaps = 3;
       lv_obj_t *time, *msecTime, *btnPlayPause, *btnStopLap, *txtPlayPause, *txtStopLap;
@@ -61,7 +64,7 @@ namespace Pinetime::Applications {
     static constexpr const char* icon = Screens::Symbols::stopWatch;
 
     static Screens::Screen* Create(AppControllers& controllers) {
-      return new Screens::StopWatch(*controllers.systemTask, controllers.stopWatchController);
+      return new Screens::StopWatch(*controllers.systemTask, controllers.stopWatchController, controllers.clockSyncService);
     }
 
     static bool IsAvailable(Pinetime::Controllers::FS& /*filesystem*/) {

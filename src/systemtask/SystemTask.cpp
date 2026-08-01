@@ -147,6 +147,7 @@ void SystemTask::Work() {
   displayApp.Register(&nimbleController.weather());
   displayApp.Register(&nimbleController.music());
   displayApp.Register(&nimbleController.navigation());
+  displayApp.Register(&nimbleController.clockSync());
   displayApp.Start(bootError);
 
   heartRateSensor.Init();

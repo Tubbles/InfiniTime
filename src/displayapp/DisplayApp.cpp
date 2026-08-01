@@ -130,6 +130,7 @@ DisplayApp::DisplayApp(Drivers::St7789& lcd,
                  this,
                  lvgl,
                  nullptr,
+                 nullptr,
                  nullptr} {
   timerController.Init(this, TimerCallback);
 }
@@ -732,6 +733,10 @@ void DisplayApp::Register(Pinetime::Controllers::MusicService* musicService) {
 
 void DisplayApp::Register(Pinetime::Controllers::NavigationService* NavigationService) {
   this->controllers.navigationService = NavigationService;
+}
+
+void DisplayApp::Register(Pinetime::Controllers::ClockSyncService* clockSyncService) {
+  this->controllers.clockSyncService = clockSyncService;
 }
 
 void DisplayApp::ApplyBrightness() {

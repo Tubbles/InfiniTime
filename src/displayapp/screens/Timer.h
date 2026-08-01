@@ -16,7 +16,10 @@ namespace Pinetime::Applications {
   namespace Screens {
     class Timer : public Screen {
     public:
-      Timer(Controllers::Timer& timerController, Controllers::MotorController& motorController, System::SystemTask& systemTask);
+      Timer(Controllers::Timer& timerController,
+            Controllers::MotorController& motorController,
+            System::SystemTask& systemTask,
+            Controllers::ClockSyncService* clockSyncService);
       ~Timer() override;
       void Refresh() override;
       void Reset();
@@ -32,6 +35,7 @@ namespace Pinetime::Applications {
       void DisplayTime();
       Pinetime::Controllers::Timer& timer;
       Pinetime::Controllers::MotorController& motorController;
+      Pinetime::Controllers::ClockSyncService* clockSyncService;
 
       Pinetime::System::WakeLock wakeLock;
 
@@ -60,7 +64,7 @@ namespace Pinetime::Applications {
     static constexpr const char* icon = Screens::Symbols::hourGlass;
 
     static Screens::Screen* Create(AppControllers& controllers) {
-      return new Screens::Timer(controllers.timer, controllers.motorController, *controllers.systemTask);
+      return new Screens::Timer(controllers.timer, controllers.motorController, *controllers.systemTask, controllers.clockSyncService);
     };
 
     static bool IsAvailable(Pinetime::Controllers::FS& /*filesystem*/) {

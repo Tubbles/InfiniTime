@@ -17,8 +17,11 @@ static void btnEventHandler(lv_obj_t* obj, lv_event_t event) {
   }
 }
 
-Timer::Timer(Controllers::Timer& timerController, Controllers::MotorController& motorController, System::SystemTask& systemTask)
-  : timer {timerController}, motorController {motorController}, wakeLock(systemTask) {
+Timer::Timer(Controllers::Timer& timerController,
+             Controllers::MotorController& motorController,
+             System::SystemTask& systemTask,
+             Controllers::ClockSyncService* clockSyncService)
+  : timer {timerController}, motorController {motorController}, clockSyncService {clockSyncService}, wakeLock(systemTask) {
 
   lv_obj_t* colonLabel = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_set_style_local_text_font(colonLabel, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &jetbrains_mono_76);
@@ -192,6 +195,9 @@ void Timer::ToggleRunning() {
     timer.StartTimer(timerDuration);
     Refresh();
     SetTimerRunning();
+  }
+  if (clockSyncService != nullptr) {
+    clockSyncService->NotifyTimer();
   }
 }
 
