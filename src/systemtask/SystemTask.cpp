@@ -40,6 +40,7 @@ SystemTask::SystemTask(Drivers::SpiMaster& spi,
                        Controllers::Ble& bleController,
                        Controllers::DateTime& dateTimeController,
                        Controllers::StopWatchController& stopWatchController,
+                       Controllers::Timer& timerController,
                        Controllers::AlarmController& alarmController,
                        Drivers::Watchdog& watchdog,
                        Pinetime::Controllers::NotificationManager& notificationManager,
@@ -61,6 +62,7 @@ SystemTask::SystemTask(Drivers::SpiMaster& spi,
     bleController {bleController},
     dateTimeController {dateTimeController},
     stopWatchController {stopWatchController},
+    timerController {timerController},
     alarmController {alarmController},
     watchdog {watchdog},
     notificationManager {notificationManager},
@@ -82,7 +84,9 @@ SystemTask::SystemTask(Drivers::SpiMaster& spi,
                      spiNorFlash,
                      heartRateController,
                      motionController,
-                     fs) {
+                     fs,
+                     stopWatchController,
+                     timerController) {
 }
 
 void SystemTask::Start() {

@@ -29,6 +29,16 @@ void StopWatchController::Clear() {
   maxLapNumber = 0;
 }
 
+void StopWatchController::SetState(bool running, TickType_t elapsed) {
+  timeElapsedPreviously = elapsed;
+  if (running) {
+    startTime = xTaskGetTickCount();
+    currentState = StopWatchStates::Running;
+  } else {
+    currentState = StopWatchStates::Paused;
+  }
+}
+
 // Lap
 
 void StopWatchController::AddLapToHistory() {

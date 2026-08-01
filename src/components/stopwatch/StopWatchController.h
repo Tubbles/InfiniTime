@@ -28,6 +28,9 @@ namespace Pinetime {
       void Pause();
       void Clear();
 
+      // Seed the state directly from an elapsed time (used by the clock-sync BLE service).
+      void SetState(bool running, TickType_t elapsed);
+
       TickType_t GetElapsedTime();
 
       // Lap functionality
