@@ -28,7 +28,6 @@ namespace Pinetime::Applications {
 
       void PlayPauseBtnEventHandler();
       void StopLapBtnEventHandler();
-      bool OnButtonPushed() override;
 
     private:
       void OnPause();

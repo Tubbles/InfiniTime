@@ -243,14 +243,6 @@ void StopWatch::StopLapBtnEventHandler() {
   }
 }
 
-bool StopWatch::OnButtonPushed() {
-  if (stopWatchController.IsRunning()) {
-    OnPause();
-    return true;
-  }
-  return false;
-}
-
 void StopWatch::OnPause() {
   stopWatchController.Pause();
   lastBlinkTime = xTaskGetTickCount();
