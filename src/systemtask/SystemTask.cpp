@@ -218,9 +218,6 @@ void SystemTask::Work() {
           wakeLocksHeld++;
           break;
         case Messages::GoToRunning:
-          // Sole sender is DisplayApp's timer-expiry handler; clear the
-          // wrist-raise lock so the ringing timer can be silenced by touch.
-          settingsController.SetLocked(false);
           GoToRunning();
           break;
         case Messages::GoToSleep:
