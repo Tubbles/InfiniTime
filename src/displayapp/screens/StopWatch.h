@@ -47,6 +47,9 @@ namespace Pinetime::Applications {
       Pinetime::System::WakeLock wakeLock;
       Controllers::StopWatchController& stopWatchController;
       Controllers::ClockSyncService* clockSyncService;
+      // Tracks what the widgets currently show; lets Refresh() detect state
+      // changes made outside this screen (phone commands via ClockSyncService).
+      Controllers::StopWatchStates displayedState = Controllers::StopWatchStates::Cleared;
       TickType_t lastBlinkTime = 0;
       uint8_t displayedLaps = 3;
       lv_obj_t *time, *msecTime, *btnPlayPause, *btnStopLap, *txtPlayPause, *txtStopLap;

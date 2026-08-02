@@ -52,6 +52,9 @@ namespace Pinetime::Applications {
       Widgets::Counter secondCounter = Widgets::Counter(0, 59, jetbrains_mono_76);
 
       bool buttonPressing = false;
+      // Tracks what the widgets currently show; lets Refresh() detect state
+      // changes made outside this screen (phone commands via ClockSyncService).
+      bool displayedRunning = false;
       lv_coord_t maskPosition = 0;
       TickType_t pressTime = 0;
       Utility::DirtyValue<std::chrono::seconds> displaySeconds;

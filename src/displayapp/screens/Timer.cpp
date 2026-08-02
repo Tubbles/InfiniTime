@@ -136,15 +136,27 @@ void Timer::Refresh() {
       Reset();
     }
   } else if (timer.IsRunning()) {
+    if (!displayedRunning) {
+      // The phone started the timer (via ClockSyncService) while this screen
+      // was open; restyle. The counters keep counting via DisplayTime().
+      SetTimerRunning();
+    }
     DisplayTime();
-  } else if (buttonPressing && xTaskGetTickCount() - pressTime > pdMS_TO_TICKS(150)) {
-    lv_label_set_text_static(txtPlayPause, "Reset");
-    maskPosition += 15;
-    if (maskPosition > 240) {
-      MaskReset();
-      Reset();
-    } else {
-      UpdateMask();
+  } else {
+    if (displayedRunning) {
+      // The phone stopped the timer while this screen was open; restyle. The
+      // counters retain the remaining time from the last running refresh.
+      SetTimerStopped();
+    }
+    if (buttonPressing && xTaskGetTickCount() - pressTime > pdMS_TO_TICKS(150)) {
+      lv_label_set_text_static(txtPlayPause, "Reset");
+      maskPosition += 15;
+      if (maskPosition > 240) {
+        MaskReset();
+        Reset();
+      } else {
+        UpdateMask();
+      }
     }
   }
 }
@@ -159,6 +171,7 @@ void Timer::DisplayTime() {
 }
 
 void Timer::SetTimerRunning() {
+  displayedRunning = true;
   minuteCounter.HideControls();
   secondCounter.HideControls();
   lv_label_set_text_static(txtPlayPause, "Pause");
@@ -166,6 +179,7 @@ void Timer::SetTimerRunning() {
 }
 
 void Timer::SetTimerStopped() {
+  displayedRunning = false;
   minuteCounter.ShowControls();
   secondCounter.ShowControls();
   lv_label_set_text_static(txtPlayPause, "Start");
@@ -173,6 +187,7 @@ void Timer::SetTimerStopped() {
 }
 
 void Timer::SetTimerRinging() {
+  displayedRunning = false;
   motorController.StartRinging();
   wakeLock.Lock();
   minuteCounter.HideControls();

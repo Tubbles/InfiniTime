@@ -34,6 +34,16 @@ namespace {
   }
 
   constexpr TickType_t blinkInterval = pdMS_TO_TICKS(1000);
+
+  StopWatchStates ControllerState(StopWatchController& stopWatchController) {
+    if (stopWatchController.IsRunning()) {
+      return StopWatchStates::Running;
+    }
+    if (stopWatchController.IsPaused()) {
+      return StopWatchStates::Paused;
+    }
+    return StopWatchStates::Cleared;
+  }
 }
 
 StopWatch::StopWatch(System::SystemTask& systemTask, StopWatchController& stopWatchController, ClockSyncService* clockSyncService)
@@ -108,6 +118,7 @@ StopWatch::~StopWatch() {
 }
 
 void StopWatch::DisplayPaused() {
+  displayedState = StopWatchStates::Paused;
   lv_obj_set_style_local_bg_color(btnStopLap, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, LV_COLOR_RED);
   lv_obj_set_style_local_bg_color(btnPlayPause, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, Colors::blue);
   lv_label_set_text_static(txtPlayPause, Symbols::play);
@@ -115,6 +126,7 @@ void StopWatch::DisplayPaused() {
 }
 
 void StopWatch::DisplayStarted() {
+  displayedState = StopWatchStates::Running;
   lv_obj_set_state(time, LV_STATE_DEFAULT);
   lv_obj_set_state(msecTime, LV_STATE_DEFAULT);
   lv_obj_set_style_local_bg_color(btnPlayPause, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, Colors::bgAlt);
@@ -128,6 +140,7 @@ void StopWatch::DisplayStarted() {
 }
 
 void StopWatch::DisplayCleared() {
+  displayedState = StopWatchStates::Cleared;
   lv_obj_set_state(time, LV_STATE_DISABLED);
   lv_obj_set_state(msecTime, LV_STATE_DISABLED);
   lv_obj_set_style_local_bg_color(btnPlayPause, LV_BTN_PART_MAIN, LV_STATE_DEFAULT, Colors::blue);
@@ -216,6 +229,27 @@ void StopWatch::SetHoursVisible(bool visible) {
 }
 
 void StopWatch::Refresh() {
+  const StopWatchStates controllerState = ControllerState(stopWatchController);
+  if (controllerState != displayedState) {
+    // The phone changed the state (via ClockSyncService) while this screen
+    // was open; restyle, mirroring what the local handlers do.
+    switch (controllerState) {
+      case StopWatchStates::Running:
+        DisplayStarted();
+        wakeLock.Lock();
+        break;
+      case StopWatchStates::Paused:
+        lastBlinkTime = xTaskGetTickCount();
+        RenderTime();
+        DisplayPaused();
+        wakeLock.Release();
+        break;
+      case StopWatchStates::Cleared:
+        DisplayCleared();
+        wakeLock.Release();
+        break;
+    }
+  }
   if (stopWatchController.IsRunning()) {
     RenderTime();
   } else if (stopWatchController.IsPaused()) {
