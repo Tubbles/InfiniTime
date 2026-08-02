@@ -313,6 +313,14 @@ namespace Pinetime {
         return bleRadioEnabled;
       };
 
+      void SetLocked(bool isLocked) {
+        locked = isLocked;
+      };
+
+      bool IsLocked() const {
+        return locked;
+      };
+
       void SetDfuAndFsMode(DfuAndFsMode mode) {
         if (mode == GetDfuAndFsMode()) {
           return;
@@ -396,6 +404,10 @@ namespace Pinetime {
        */
       bool bleRadioEnabled = true;
       bool dfuAndFsEnabledTillReboot = false;
+      /* wrist-raise lock: runtime-only so the watch always boots unlocked.
+       * Set by SystemTask on a raise-wrist wake, cleared on button unlock,
+       * sleep, and alarm/timer alerts. */
+      bool locked = false;
 
       void LoadSettingsFromFile();
       void SaveSettingsToFile();

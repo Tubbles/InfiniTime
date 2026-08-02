@@ -291,13 +291,24 @@ void WatchFaceCasioStyleG7710::Refresh() {
 
   heartbeat = heartRateController.HeartRate();
   heartbeatRunning = heartRateController.State() != Controllers::HeartRateController::States::Stopped;
-  if (heartbeat.IsUpdated() || heartbeatRunning.IsUpdated()) {
-    if (heartbeatRunning.Get()) {
+  lockedState = settingsController.IsLocked();
+  if (heartbeat.IsUpdated() || heartbeatRunning.IsUpdated() || lockedState.IsUpdated()) {
+    // The wrist-raise lock indicator borrows the heart-rate slot: it wins
+    // while locked, and the icon must be restored on unlock (the ctor only
+    // sets it once).
+    if (lockedState.Get()) {
+      lv_label_set_text_static(heartbeatIcon, Symbols::shieldAlt);
       lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
-      lv_label_set_text_fmt(heartbeatValue, "%d", heartbeat.Get());
-    } else {
-      lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, lv_color_hex(0x1B1B1B));
       lv_label_set_text_static(heartbeatValue, "");
+    } else {
+      lv_label_set_text_static(heartbeatIcon, Symbols::heartBeat);
+      if (heartbeatRunning.Get()) {
+        lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+        lv_label_set_text_fmt(heartbeatValue, "%d", heartbeat.Get());
+      } else {
+        lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, lv_color_hex(0x1B1B1B));
+        lv_label_set_text_static(heartbeatValue, "");
+      }
     }
 
     lv_obj_realign(heartbeatIcon);

@@ -218,6 +218,9 @@ void SystemTask::Work() {
           wakeLocksHeld++;
           break;
         case Messages::GoToRunning:
+          // Sole sender is DisplayApp's timer-expiry handler; clear the
+          // wrist-raise lock so the ringing timer can be silenced by touch.
+          settingsController.SetLocked(false);
           GoToRunning();
           break;
         case Messages::GoToSleep:
@@ -237,6 +240,9 @@ void SystemTask::Work() {
           }
           break;
         case Messages::SetOffAlarm:
+          // Clear the wrist-raise lock: while locked, touch is rejected and
+          // the button only unlocks, so a locked alarm could not be dismissed.
+          settingsController.SetLocked(false);
           GoToRunning();
           displayApp.PushMessage(Pinetime::Applications::Display::Messages::AlarmTriggered);
           break;
@@ -268,6 +274,13 @@ void SystemTask::Work() {
           // TODO add intent of fs access icon or something
           break;
         case Messages::OnTouchEvent:
+          // Wrist-raise lock: swallow the touch before it is even read. The
+          // touch IRQ is edge-triggered and re-asserts on the next touch, and
+          // a swallowed touch never resets the sleep timeout, so a stray
+          // raise-wake still dims and sleeps on its own.
+          if (state == SystemTaskState::Running && settingsController.IsLocked()) {
+            break;
+          }
           // Finish immediately if no new events
           if (!touchHandler.ProcessTouchInfo(touchPanel.GetTouchInfo())) {
             break;
@@ -442,6 +455,10 @@ void SystemTask::GoToSleep() {
     return;
   }
   NRF_LOG_INFO("[systemtask] Going to sleep");
+  // Every entry into sleep clears the wrist-raise lock: the sleeping
+  // button-wake path breaks before HandleButtonAction, so without this a
+  // locked screen that timed out would come up locked on a button wake.
+  settingsController.SetLocked(false);
   if (settingsController.GetAlwaysOnDisplay()) {
     displayApp.PushMessage(Pinetime::Applications::Display::Messages::GoToAOD);
   } else {
@@ -461,11 +478,19 @@ void SystemTask::UpdateMotion() {
   motionController.Update(motionValues.x, motionValues.y, motionValues.z, motionValues.steps);
 
   if (settingsController.GetNotificationStatus() != Controllers::Settings::Notification::Sleep) {
-    if ((settingsController.isWakeUpModeOn(Pinetime::Controllers::Settings::WakeUpMode::RaiseWrist) &&
-         motionController.ShouldRaiseWake()) ||
-        (settingsController.isWakeUpModeOn(Pinetime::Controllers::Settings::WakeUpMode::Shake) &&
-         motionController.CurrentShakeSpeed() > settingsController.GetShakeThreshold())) {
+    const bool raiseWake = settingsController.isWakeUpModeOn(Pinetime::Controllers::Settings::WakeUpMode::RaiseWrist) &&
+                           motionController.ShouldRaiseWake();
+    const bool shakeWake = settingsController.isWakeUpModeOn(Pinetime::Controllers::Settings::WakeUpMode::Shake) &&
+                           motionController.CurrentShakeSpeed() > settingsController.GetShakeThreshold();
+    if (raiseWake || shakeWake) {
+      const bool wasSleeping = IsSleeping();
       GoToRunning();
+      if (wasSleeping && raiseWake) {
+        // A raise-wrist wake only shows the screen; touch stays rejected
+        // until the button is pressed (see HandleButtonAction). All other
+        // wake sources, including shake, come up unlocked.
+        settingsController.SetLocked(true);
+      }
     }
   }
   if (settingsController.isWakeUpModeOn(Pinetime::Controllers::Settings::WakeUpMode::LowerWrist) && state == SystemTaskState::Running &&
@@ -480,6 +505,16 @@ void SystemTask::HandleButtonAction(Controllers::ButtonActions action) {
   }
 
   displayApp.PushMessage(Pinetime::Applications::Display::Messages::NotifyDeviceActivity);
+
+  // Wrist-raise lock: the first resolved action only unlocks and is consumed,
+  // so it does not also act as back/sleep. Placed after NotifyDeviceActivity
+  // so the unlocking press also resets the dim/sleep inactivity timer.
+  if (settingsController.IsLocked()) {
+    if (action != Controllers::ButtonActions::None) {
+      settingsController.SetLocked(false);
+    }
+    return;
+  }
 
   using Actions = Controllers::ButtonActions;
 
