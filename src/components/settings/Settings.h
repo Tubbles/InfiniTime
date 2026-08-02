@@ -321,6 +321,17 @@ namespace Pinetime {
         return locked;
       };
 
+      void SetIntercomKey(char key) {
+        if (key != settings.intercomKey) {
+          settingsChanged = true;
+        }
+        settings.intercomKey = key;
+      };
+
+      char GetIntercomKey() const {
+        return settings.intercomKey;
+      };
+
       void SetDfuAndFsMode(DfuAndFsMode mode) {
         if (mode == GetDfuAndFsMode()) {
           return;
@@ -362,7 +373,7 @@ namespace Pinetime {
     private:
       Pinetime::Controllers::FS& fs;
 
-      static constexpr uint32_t settingsVersion = 0x000a;
+      static constexpr uint32_t settingsVersion = 0x000b;
 
       struct SettingsData {
         uint32_t version = settingsVersion;
@@ -391,6 +402,9 @@ namespace Pinetime {
 
         bool dfuAndFsEnabledOnBoot = false;
         uint16_t heartRateBackgroundPeriod = std::numeric_limits<uint16_t>::max(); // Disabled by default
+
+        // In-call intercom button: 0 = off, else the ASCII key ('0'-'9', '*', '#')
+        char intercomKey = 0;
       };
 
       SettingsData settings;

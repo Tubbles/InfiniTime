@@ -30,6 +30,7 @@ namespace Pinetime {
       Steps,
       Dice,
       Weather,
+      InCall,
       PassKey,
       QuickSettings,
       Settings,
@@ -45,6 +46,7 @@ namespace Pinetime {
       SettingShakeThreshold,
       SettingBluetooth,
       SettingOTA,
+      SettingIntercom,
       Error
     };
 

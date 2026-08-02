@@ -48,6 +48,7 @@
 #include "displayapp/screens/settings/SettingSteps.h"
 #include "displayapp/screens/settings/SettingSetDateTime.h"
 #include "displayapp/screens/settings/SettingChimes.h"
+#include "displayapp/screens/settings/SettingIntercom.h"
 #include "displayapp/screens/settings/SettingHeartRate.h"
 #include "displayapp/screens/settings/SettingShakeThreshold.h"
 #include "displayapp/screens/settings/SettingBluetooth.h"
@@ -129,6 +130,8 @@ DisplayApp::DisplayApp(Drivers::St7789& lcd,
                  nullptr,
                  this,
                  lvgl,
+                 nullptr,
+                 nullptr,
                  nullptr,
                  nullptr,
                  nullptr} {
@@ -632,6 +635,9 @@ void DisplayApp::LoadScreen(Apps app, DisplayApp::FullRefreshDirections directio
     case Apps::SettingChimes:
       currentScreen = std::make_unique<Screens::SettingChimes>(settingsController);
       break;
+    case Apps::SettingIntercom:
+      currentScreen = std::make_unique<Screens::SettingIntercom>(settingsController);
+      break;
     case Apps::SettingShakeThreshold:
       currentScreen = std::make_unique<Screens::SettingShakeThreshold>(settingsController, motionController, *systemTask);
       break;
@@ -741,6 +747,14 @@ void DisplayApp::Register(Pinetime::Controllers::NavigationService* NavigationSe
 
 void DisplayApp::Register(Pinetime::Controllers::ClockSyncService* clockSyncService) {
   this->controllers.clockSyncService = clockSyncService;
+}
+
+void DisplayApp::Register(Pinetime::Controllers::KeyTonesService* keyTonesService) {
+  this->controllers.keyTonesService = keyTonesService;
+}
+
+void DisplayApp::Register(Pinetime::Controllers::AlertNotificationService* alertService) {
+  this->controllers.alertService = alertService;
 }
 
 void DisplayApp::ApplyBrightness() {

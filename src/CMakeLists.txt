@@ -396,6 +396,7 @@ list(APPEND SOURCE_FILES
         displayapp/screens/PassKey.cpp
         displayapp/screens/Error.cpp
         displayapp/screens/Alarm.cpp
+        displayapp/screens/InCall.cpp
         displayapp/screens/Styles.cpp
         displayapp/screens/WeatherSymbols.cpp
         displayapp/Colors.cpp
@@ -418,6 +419,7 @@ list(APPEND SOURCE_FILES
         displayapp/screens/settings/SettingSetDate.cpp
         displayapp/screens/settings/SettingSetTime.cpp
         displayapp/screens/settings/SettingChimes.cpp
+        displayapp/screens/settings/SettingIntercom.cpp
         displayapp/screens/settings/SettingShakeThreshold.cpp
         displayapp/screens/settings/SettingBluetooth.cpp
         displayapp/screens/settings/SettingOTA.cpp
@@ -460,6 +462,7 @@ list(APPEND SOURCE_FILES
         components/ble/MusicService.cpp
         components/ble/SimpleWeatherService.cpp
         components/ble/ClockSyncService.cpp
+        components/ble/KeyTonesService.cpp
         components/ble/NavigationService.cpp
         components/ble/BatteryInformationService.cpp
         components/ble/FSService.cpp
@@ -532,6 +535,7 @@ list(APPEND RECOVERY_SOURCE_FILES
         components/ble/MusicService.cpp
         components/ble/SimpleWeatherService.cpp
         components/ble/ClockSyncService.cpp
+        components/ble/KeyTonesService.cpp
         components/ble/BatteryInformationService.cpp
         components/ble/FSService.cpp
         components/ble/ImmediateAlertService.cpp
