@@ -245,6 +245,17 @@ void SystemTask::Work() {
           GoToRunning();
           displayApp.PushMessage(Pinetime::Applications::Display::Messages::AlarmTriggered);
           break;
+        case Messages::CallStarted:
+          // A call needs touch (hang up, DTMF keys): wake and unlock, like
+          // the alarm does.
+          settingsController.SetLocked(false);
+          GoToRunning();
+          displayApp.PushMessage(Pinetime::Applications::Display::Messages::CallStarted);
+          break;
+        case Messages::CallEnded:
+          // No wake: only close the InCall screen if it is frontmost.
+          displayApp.PushMessage(Pinetime::Applications::Display::Messages::CallEnded);
+          break;
         case Messages::BleConnected:
           displayApp.PushMessage(Pinetime::Applications::Display::Messages::NotifyDeviceActivity);
           isBleDiscoveryTimerRunning = true;

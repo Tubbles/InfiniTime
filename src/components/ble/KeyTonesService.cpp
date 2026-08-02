@@ -18,15 +18,38 @@
 
 #include "components/ble/KeyTonesService.h"
 #include "components/ble/NimbleController.h"
+#include "systemtask/SystemTask.h"
 
 using namespace Pinetime::Controllers;
 
-int KeyTonesCallback(uint16_t /*connHandle*/, uint16_t /*attrHandle*/, struct ble_gatt_access_ctxt* /*ctxt*/, void* /*arg*/) {
-  // Notify-only characteristic: nothing to read or write.
-  return 0;
+int KeyTonesCallback(uint16_t /*connHandle*/, uint16_t /*attrHandle*/, struct ble_gatt_access_ctxt* ctxt, void* arg) {
+  return static_cast<Pinetime::Controllers::KeyTonesService*>(arg)->OnCallState(ctxt);
 }
 
-KeyTonesService::KeyTonesService(NimbleController& nimble) : nimble {nimble} {
+KeyTonesService::KeyTonesService(NimbleController& nimble, Pinetime::System::SystemTask& systemTask)
+  : nimble {nimble}, systemTask {systemTask} {
+}
+
+int KeyTonesService::OnCallState(struct ble_gatt_access_ctxt* ctxt) {
+  // Only the call-state characteristic is writable; the key characteristic
+  // never produces an access op.
+  if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) {
+    return 0;
+  }
+  if (ctxt->om->om_len < 1) {
+    return 0;
+  }
+  switch (ctxt->om->om_data[0]) {
+    case 1:
+      systemTask.PushMessage(System::Messages::CallStarted);
+      break;
+    case 0:
+      systemTask.PushMessage(System::Messages::CallEnded);
+      break;
+    default:
+      break;
+  }
+  return 0;
 }
 
 void KeyTonesService::Init() {

@@ -24,6 +24,8 @@ namespace Pinetime {
         AlarmTriggered,
         Chime,
         BleRadioEnableToggle,
+        CallStarted,
+        CallEnded,
       };
     }
   }

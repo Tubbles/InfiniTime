@@ -402,6 +402,20 @@ void DisplayApp::Refresh() {
           LoadNewScreen(Apps::Alarm, DisplayApp::FullRefreshDirections::None);
         }
         break;
+      case Messages::CallStarted:
+        // Sent by a Gadgetbridge fork when a call becomes active; stock
+        // Gadgetbridge never sends it and the InCall app is opened by hand.
+        if (currentApp != Apps::InCall) {
+          LoadNewScreen(Apps::InCall, DisplayApp::FullRefreshDirections::Up);
+        }
+        break;
+      case Messages::CallEnded:
+        // The InCall wake lock keeps the screen awake while it is frontmost,
+        // so a stale InCall can only be the current app in the Running state.
+        if (currentApp == Apps::InCall) {
+          LoadPreviousScreen();
+        }
+        break;
       case Messages::ShowPairingKey:
         LoadNewScreen(Apps::PassKey, DisplayApp::FullRefreshDirections::Up);
         motorController.RunForDuration(35);
