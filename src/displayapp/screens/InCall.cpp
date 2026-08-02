@@ -152,3 +152,13 @@ bool InCall::OnTouchEvent(Pinetime::Applications::TouchEvents event) {
   }
   return false;
 }
+
+bool InCall::OnButtonPushed() {
+  // Same for the physical button: from the keypad it backs out one level to
+  // the main in-call view; only from there does it leave the app.
+  if (currentView == View::Keypad) {
+    ShowMainView();
+    return true;
+  }
+  return false;
+}

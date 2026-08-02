@@ -34,6 +34,7 @@ namespace Pinetime {
         ~InCall() override;
 
         bool OnTouchEvent(TouchEvents event) override;
+        bool OnButtonPushed() override;
 
         void OnMainButtonEvent(lv_obj_t* obj, lv_event_t event);
         void OnKeypadEvent(lv_obj_t* obj, lv_event_t event);
