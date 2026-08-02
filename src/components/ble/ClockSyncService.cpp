@@ -51,8 +51,17 @@ namespace {
     }
   }
 
+  // The frame reference field is a UTC epoch (the phone side uses
+  // System.currentTimeMillis()). CurrentDateTime() is the local wall clock
+  // (Gadgetbridge sets it via CTS in local time), so it would skew every
+  // reference by the UTC offset: a phone->watch timer would compute
+  // remaining = reference - now - offset and silently stop instead of
+  // starting. UTCDateTime() subtracts the tz/DST offsets that Gadgetbridge
+  // writes to the Local Time characteristic on every connect; if they were
+  // never written both clocks read the same and this degrades to the old
+  // behavior.
   int64_t NowMs(Pinetime::Controllers::DateTime& dateTimeController) {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(dateTimeController.CurrentDateTime().time_since_epoch()).count();
+    return std::chrono::duration_cast<std::chrono::milliseconds>(dateTimeController.UTCDateTime().time_since_epoch()).count();
   }
 
   TickType_t MsToTicks(uint32_t milliseconds) {
