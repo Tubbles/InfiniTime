@@ -37,7 +37,8 @@ namespace Pinetime {
     class NimbleController;
 
     // In-call service: sends DTMF key presses to the companion app (one ASCII
-    // byte per press, '0'-'9'/'*'/'#', notify-only, fire-and-forget) and
+    // byte per press, '0'-'9'/'*'/'#', plus 'E' to end the call, notify-only,
+    // fire-and-forget) and
     // receives call state from a Gadgetbridge fork (1 byte: 0 = call ended,
     // 1 = call active) to open/close the InCall screen. Stock Gadgetbridge
     // never writes the call-state characteristic; everything still works, the

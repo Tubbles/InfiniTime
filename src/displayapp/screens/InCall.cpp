@@ -118,8 +118,12 @@ void InCall::OnMainButtonEvent(lv_obj_t* obj, lv_event_t event) {
     return;
   }
   if (obj == btnHangUp) {
-    alertService.RejectIncomingCall(); // the companion maps this to "end the ongoing call"
-    motorController.RunForDuration(20);
+    // Two paths, because each covers what the other cannot: the companion
+    // maps the alert-service reject to TelecomManager.endCall (deprecated,
+    // silently refused for some ongoing calls), while 'E' reaches the dialer
+    // app, whose InCallService can always end the call it owns.
+    alertService.RejectIncomingCall();
+    SendKey('E');
     running = false;
   } else if (obj == btnNumberpad) {
     ShowKeypadView();
