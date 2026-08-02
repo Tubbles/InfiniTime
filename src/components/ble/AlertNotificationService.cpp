@@ -44,6 +44,35 @@ AlertNotificationService::AlertNotificationService(System::SystemTask& systemTas
     notificationManager {notificationManager} {
 }
 
+namespace {
+  // Length in bytes of the longest prefix of text that does not end in the
+  // leading bytes of a cut-off UTF-8 multi-byte character (the byte cap in
+  // OnAlert can truncate one mid-sequence).
+  size_t LengthWithoutTruncatedUtf8(const char* text, size_t length) {
+    size_t continuationBytes = 0;
+    while (continuationBytes < 3 && continuationBytes < length &&
+           (static_cast<uint8_t>(text[length - 1 - continuationBytes]) & 0xc0) == 0x80) {
+      continuationBytes++;
+    }
+    if (continuationBytes >= length) {
+      return length;
+    }
+    const auto leadByte = static_cast<uint8_t>(text[length - 1 - continuationBytes]);
+    size_t expectedLength = 1;
+    if ((leadByte & 0xe0) == 0xc0) {
+      expectedLength = 2;
+    } else if ((leadByte & 0xf0) == 0xe0) {
+      expectedLength = 3;
+    } else if ((leadByte & 0xf8) == 0xf0) {
+      expectedLength = 4;
+    }
+    if (expectedLength > continuationBytes + 1) {
+      return length - 1 - continuationBytes;
+    }
+    return length;
+  }
+}
+
 int AlertNotificationService::OnAlert(struct ble_gatt_access_ctxt* ctxt) {
   if (ctxt->op == BLE_GATT_ACCESS_OP_WRITE_CHR) {
     constexpr size_t stringTerminatorSize = 1; // end of string '\0'
@@ -64,6 +93,7 @@ int AlertNotificationService::OnAlert(struct ble_gatt_access_ctxt* ctxt) {
     NotificationManager::Notification notif;
     os_mbuf_copydata(ctxt->om, headerSize, messageSize - 1, notif.message.data());
     os_mbuf_copydata(ctxt->om, 0, 1, &category);
+    messageSize = LengthWithoutTruncatedUtf8(notif.message.data(), messageSize - 1) + stringTerminatorSize;
     notif.message[messageSize - 1] = '\0';
     notif.size = messageSize;
 
