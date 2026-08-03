@@ -2,6 +2,7 @@
 #include "displayapp/DisplayApp.h"
 #include "components/ble/MusicService.h"
 #include "components/ble/AlertNotificationService.h"
+#include "components/ble/KeyTonesService.h"
 #include "displayapp/screens/Symbols.h"
 #include <algorithm>
 #include "displayapp/InfiniTimeTheme.h"
@@ -13,12 +14,14 @@ extern lv_font_t jetbrains_mono_bold_20;
 Notifications::Notifications(DisplayApp* app,
                              Pinetime::Controllers::NotificationManager& notificationManager,
                              Pinetime::Controllers::AlertNotificationService& alertNotificationService,
+                             Pinetime::Controllers::KeyTonesService& keyTonesService,
                              Pinetime::Controllers::MotorController& motorController,
                              System::SystemTask& systemTask,
                              Modes mode)
   : app {app},
     notificationManager {notificationManager},
     alertNotificationService {alertNotificationService},
+    keyTonesService {keyTonesService},
     motorController {motorController},
     wakeLock(systemTask),
     mode {mode} {
@@ -33,11 +36,12 @@ Notifications::Notifications(DisplayApp* app,
                                                      notification.category,
                                                      notificationManager.NbNotifications(),
                                                      alertNotificationService,
+                                                     keyTonesService,
                                                      motorController,
                                                      app);
     validDisplay = true;
   } else {
-    currentItem = std::make_unique<NotificationItem>(alertNotificationService, motorController, app);
+    currentItem = std::make_unique<NotificationItem>(alertNotificationService, keyTonesService, motorController, app);
     validDisplay = false;
   }
   if (mode == Modes::Preview) {
@@ -110,6 +114,7 @@ void Notifications::Refresh() {
                                                        notification.category,
                                                        notificationManager.NbNotifications(),
                                                        alertNotificationService,
+                                                       keyTonesService,
                                                        motorController,
                                                        app);
     } else {
@@ -204,6 +209,7 @@ bool Notifications::OnTouchEvent(Pinetime::Applications::TouchEvents event) {
                                                        previousNotification.category,
                                                        notificationManager.NbNotifications(),
                                                        alertNotificationService,
+                                                       keyTonesService,
                                                        motorController,
                                                        app);
     }
@@ -232,6 +238,7 @@ bool Notifications::OnTouchEvent(Pinetime::Applications::TouchEvents event) {
                                                        nextNotification.category,
                                                        notificationManager.NbNotifications(),
                                                        alertNotificationService,
+                                                       keyTonesService,
                                                        motorController,
                                                        app);
     }
@@ -249,6 +256,7 @@ namespace {
 }
 
 Notifications::NotificationItem::NotificationItem(Pinetime::Controllers::AlertNotificationService& alertNotificationService,
+                                                  Pinetime::Controllers::KeyTonesService& keyTonesService,
                                                   Pinetime::Controllers::MotorController& motorController,
                                                   DisplayApp* displayApp)
   : NotificationItem("Notifications",
@@ -257,6 +265,7 @@ Notifications::NotificationItem::NotificationItem(Pinetime::Controllers::AlertNo
                      Controllers::NotificationManager::Categories::Unknown,
                      0,
                      alertNotificationService,
+                     keyTonesService,
                      motorController,
                      displayApp) {
 }
@@ -267,9 +276,13 @@ Notifications::NotificationItem::NotificationItem(const char* title,
                                                   Controllers::NotificationManager::Categories category,
                                                   uint8_t notifNb,
                                                   Pinetime::Controllers::AlertNotificationService& alertNotificationService,
+                                                  Pinetime::Controllers::KeyTonesService& keyTonesService,
                                                   Pinetime::Controllers::MotorController& motorController,
                                                   DisplayApp* displayApp)
-  : alertNotificationService {alertNotificationService}, motorController {motorController}, displayApp {displayApp} {
+  : alertNotificationService {alertNotificationService},
+    keyTonesService {keyTonesService},
+    motorController {motorController},
+    displayApp {displayApp} {
   container = lv_cont_create(lv_scr_act(), nullptr);
   lv_obj_set_size(container, LV_HOR_RES, LV_VER_RES);
   lv_obj_set_style_local_bg_color(container, LV_CONT_PART_MAIN, LV_STATE_DEFAULT, LV_COLOR_BLACK);
@@ -366,7 +379,12 @@ void Notifications::NotificationItem::OnCallButtonEvent(lv_obj_t* obj, lv_event_
   motorController.StopRinging();
 
   if (obj == bt_accept) {
+    // Two paths, like hang-up: the companion maps the ANS accept to the
+    // deprecated TelecomManager.acceptRingingCall, which can be silently
+    // refused, while 'A' reaches the dialer app, whose InCallService can
+    // always answer the call it owns.
     alertNotificationService.AcceptIncomingCall();
+    keyTonesService.NotifyKey('A');
     // Jump straight to the in-call screen (hang up, DTMF keys); the previous
     // screen on the return stack stays whatever was below this notification.
     displayApp->StartApp(Apps::InCall, DisplayApp::FullRefreshDirections::Up);

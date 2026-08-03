@@ -13,6 +13,7 @@
 namespace Pinetime {
   namespace Controllers {
     class AlertNotificationService;
+    class KeyTonesService;
   }
 
   namespace Applications {
@@ -24,6 +25,7 @@ namespace Pinetime {
         explicit Notifications(DisplayApp* app,
                                Pinetime::Controllers::NotificationManager& notificationManager,
                                Pinetime::Controllers::AlertNotificationService& alertNotificationService,
+                               Pinetime::Controllers::KeyTonesService& keyTonesService,
                                Pinetime::Controllers::MotorController& motorController,
                                System::SystemTask& systemTask,
                                Modes mode);
@@ -38,6 +40,7 @@ namespace Pinetime {
         class NotificationItem {
         public:
           NotificationItem(Pinetime::Controllers::AlertNotificationService& alertNotificationService,
+                           Pinetime::Controllers::KeyTonesService& keyTonesService,
                            Pinetime::Controllers::MotorController& motorController,
                            DisplayApp* displayApp);
           NotificationItem(const char* title,
@@ -46,6 +49,7 @@ namespace Pinetime {
                            Controllers::NotificationManager::Categories,
                            uint8_t notifNb,
                            Pinetime::Controllers::AlertNotificationService& alertNotificationService,
+                           Pinetime::Controllers::KeyTonesService& keyTonesService,
                            Pinetime::Controllers::MotorController& motorController,
                            DisplayApp* displayApp);
           ~NotificationItem();
@@ -66,6 +70,7 @@ namespace Pinetime {
           lv_obj_t* label_mute;
           lv_obj_t* label_reject;
           Pinetime::Controllers::AlertNotificationService& alertNotificationService;
+          Pinetime::Controllers::KeyTonesService& keyTonesService;
           Pinetime::Controllers::MotorController& motorController;
           DisplayApp* displayApp;
 
@@ -76,6 +81,7 @@ namespace Pinetime {
         DisplayApp* app;
         Pinetime::Controllers::NotificationManager& notificationManager;
         Pinetime::Controllers::AlertNotificationService& alertNotificationService;
+        Pinetime::Controllers::KeyTonesService& keyTonesService;
         Pinetime::Controllers::MotorController& motorController;
         System::WakeLock wakeLock;
         Modes mode = Modes::Normal;
