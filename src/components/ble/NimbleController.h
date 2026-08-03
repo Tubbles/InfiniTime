@@ -96,6 +96,7 @@ namespace Pinetime {
     private:
       void PersistBond(struct ble_gap_conn_desc& desc);
       void RestoreBond();
+      void AnnounceGattChangeAfterFirmwareUpdate();
 
       static constexpr const char* deviceName = "InfiniTime";
       Pinetime::System::SystemTask& systemTask;
@@ -125,6 +126,10 @@ namespace Pinetime {
       uint8_t addrType;
       uint16_t connectionHandle = BLE_HS_CONN_HANDLE_NONE;
       uint8_t fastAdvCount = 0;
+      // Set for the boot session that first runs a new firmware; drives the
+      // Service Changed indication that tells clients to drop their GATT cache.
+      bool gattLayoutChangedThisBoot = false;
+      uint16_t serviceChangedValueHandle = 0;
       uint8_t bondId[16] = {0};
     };
 

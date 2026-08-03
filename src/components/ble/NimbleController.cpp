@@ -1,4 +1,5 @@
 #include "components/ble/NimbleController.h"
+#include "Version.h"
 #include <cstring>
 
 #include <nrf_log.h>
@@ -94,8 +95,6 @@ void NimbleController::Init() {
   currentTimeService.Init();
   musicService.Init();
   weatherService.Init();
-  clockSyncService.Init();
-  keyTonesService.Init();
   navService.Init();
   anService.Init();
   dfuService.Init();
@@ -104,6 +103,12 @@ void NimbleController::Init() {
   heartRateService.Init();
   motionService.Init();
   fsService.Init();
+  // This project's own services register LAST, so every stock service
+  // (including DFU) keeps the same attribute handles as upstream firmware and
+  // a client with a stale GATT cache still reaches them. New services must
+  // only ever be appended here.
+  clockSyncService.Init();
+  keyTonesService.Init();
 
   int rc;
   rc = ble_hs_util_ensure_addr(0);
@@ -139,7 +144,46 @@ void NimbleController::Init() {
 
   RestoreBond();
 
+  AnnounceGattChangeAfterFirmwareUpdate();
+
   StartAdvertising();
+}
+
+/* On the first boot of a new firmware, mark the whole GATT database as
+ * changed. NimBLE then indicates Service Changed to live subscribers, and for
+ * bonded-but-disconnected peers it persists a pending flag in the CCCD store
+ * (delivered by ble_gatts_bonding_restored on their next reconnect), so a
+ * bonded phone drops its GATT cache instead of writing at stale handles.
+ * Firmware updates move handles whenever services change, and a stale cache
+ * makes the phone's writes land on the wrong attribute (field-diagnosed as
+ * DFU failing with GATT REQ NOT SUPPORTED: the control-point CCCD write hit
+ * the Service Changed CCCD). The firmware fingerprint lives in
+ * /fw_version.dat; the boot session keeps a flag so a client subscribing to
+ * Service Changed later this session (fresh pairing with a stale cache) is
+ * told as well, from the subscribe handler. */
+void NimbleController::AnnounceGattChangeAfterFirmwareUpdate() {
+  constexpr const char* versionFile = "/fw_version.dat";
+  const char* currentVersion = Version::GitCommitHash();
+  char storedVersion[41] = {0};
+  lfs_file_t file_p;
+  bool changed = true;
+
+  if (fs.FileOpen(&file_p, versionFile, LFS_O_RDONLY) == 0) {
+    fs.FileRead(&file_p, reinterpret_cast<uint8_t*>(storedVersion), sizeof(storedVersion) - 1);
+    fs.FileClose(&file_p);
+    changed = std::strncmp(storedVersion, currentVersion, sizeof(storedVersion) - 1) != 0;
+  }
+  if (!changed) {
+    return;
+  }
+
+  gattLayoutChangedThisBoot = true;
+  ble_svc_gatt_changed(0x0001, 0xffff);
+
+  if (fs.FileOpen(&file_p, versionFile, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) == 0) {
+    fs.FileWrite(&file_p, reinterpret_cast<const uint8_t*>(currentVersion), std::strlen(currentVersion));
+    fs.FileClose(&file_p);
+  }
 }
 
 void NimbleController::StartAdvertising() {
@@ -329,6 +373,21 @@ int NimbleController::OnGAPEvent(ble_gap_event* event) {
                    event->subscribe.cur_notify,
                    event->subscribe.prev_indicate);
 
+      // A client subscribing to Service Changed on the first boot session of
+      // a new firmware gets the changed indication even if it paired freshly:
+      // fresh pairings have been observed carrying a stale GATT cache. For a
+      // genuinely fresh client this only costs one extra discovery.
+      if (gattLayoutChangedThisBoot && event->subscribe.cur_indicate == 1) {
+        if (serviceChangedValueHandle == 0) {
+          static constexpr ble_uuid16_t gattServiceUuid {.u {.type = BLE_UUID_TYPE_16}, .value = 0x1801};
+          static constexpr ble_uuid16_t serviceChangedCharUuid {.u {.type = BLE_UUID_TYPE_16}, .value = 0x2a05};
+          ble_gatts_find_chr(&gattServiceUuid.u, &serviceChangedCharUuid.u, nullptr, &serviceChangedValueHandle);
+        }
+        if (event->subscribe.attr_handle == serviceChangedValueHandle) {
+          ble_svc_gatt_changed(0x0001, 0xffff);
+        }
+      }
+
       if (event->subscribe.reason == BLE_GAP_SUBSCRIBE_REASON_TERM) {
         heartRateService.UnsubscribeNotification(event->subscribe.attr_handle);
         motionService.UnsubscribeNotification(event->subscribe.attr_handle);
@@ -454,7 +513,10 @@ void NimbleController::PersistBond(struct ble_gap_conn_desc& desc) {
     int peer_count = 0;
     ble_store_util_count(BLE_STORE_OBJ_TYPE_CCCD, &peer_count);
     for (int i = 0; i < peer_count; i++) {
-      key.cccd.idx = peer_count;
+      // Upstream bug: this used idx = peer_count (out of range for every
+      // iteration), so bond.dat carried zeroed CCCD entries and the peer's
+      // persisted subscriptions never actually survived a reboot.
+      key.cccd.idx = i;
       ble_store_read_cccd(&key.cccd, &peer_cccd_set[i].cccd);
     }
 
