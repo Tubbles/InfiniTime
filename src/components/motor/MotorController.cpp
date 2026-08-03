@@ -11,11 +11,22 @@ void MotorController::Init() {
 
   shortVib = xTimerCreate("shortVib", 1, pdFALSE, nullptr, StopMotor);
   longVib = xTimerCreate("longVib", pdMS_TO_TICKS(1000), pdTRUE, this, Ring);
+  doubleVib = xTimerCreate("doubleVib", pdMS_TO_TICKS(250), pdFALSE, this, RunSecondBuzz);
 }
 
 void MotorController::Ring(TimerHandle_t xTimer) {
   auto* motorController = static_cast<MotorController*>(pvTimerGetTimerID(xTimer));
   motorController->RunForDuration(50);
+}
+
+void MotorController::RunSecondBuzz(TimerHandle_t xTimer) {
+  auto* motorController = static_cast<MotorController*>(pvTimerGetTimerID(xTimer));
+  motorController->RunForDuration(100);
+}
+
+void MotorController::RunDoubleBuzz() {
+  RunForDuration(100);
+  xTimerStart(doubleVib, 0);
 }
 
 void MotorController::RunForDuration(uint8_t motorDuration) {

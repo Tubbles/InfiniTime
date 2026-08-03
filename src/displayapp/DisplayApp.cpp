@@ -372,6 +372,12 @@ void DisplayApp::Refresh() {
       case Messages::UpdateBleConnection:
         // Only used for recovery firmware
         break;
+      case Messages::BleDisconnected:
+        // Connection-lost warning: two short buzzes, no screen wake. The
+        // display task processes its queue with the screen off, so this
+        // fires whether or not the watch is awake.
+        motorController.RunDoubleBuzz();
+        break;
       case Messages::NewNotification:
         LoadNewScreen(Apps::NotificationsPreview, DisplayApp::FullRefreshDirections::Down);
         break;

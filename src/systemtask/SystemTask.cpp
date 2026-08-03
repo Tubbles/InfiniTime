@@ -256,6 +256,10 @@ void SystemTask::Work() {
           // No wake: only close the InCall screen if it is frontmost.
           displayApp.PushMessage(Pinetime::Applications::Display::Messages::CallEnded);
           break;
+        case Messages::BleDisconnected:
+          // Warning buzz only; the screen stays as it is.
+          displayApp.PushMessage(Pinetime::Applications::Display::Messages::BleDisconnected);
+          break;
         case Messages::BleConnected:
           displayApp.PushMessage(Pinetime::Applications::Display::Messages::NotifyDeviceActivity);
           isBleDiscoveryTimerRunning = true;

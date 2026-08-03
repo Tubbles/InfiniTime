@@ -26,6 +26,7 @@ namespace Pinetime {
         BleRadioEnableToggle,
         CallStarted,
         CallEnded,
+        BleDisconnected,
       };
     }
   }
