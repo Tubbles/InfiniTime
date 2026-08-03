@@ -232,6 +232,15 @@ void SystemTask::Work() {
           break;
         case Messages::OnNewNotification:
           if (settingsController.GetNotificationStatus() == Pinetime::Controllers::Settings::Notification::On) {
+            // A RINGING call needs touch (answer/reject), like the alarm and
+            // an established call. Without this, a raise-locked watch swallows
+            // the answer tap, and the CallStarted unlock can never fire
+            // because answering is what triggers it. Ordinary notifications
+            // stay view-only under the lock.
+            if (notificationManager.GetLastNotification().category ==
+                Pinetime::Controllers::NotificationManager::Categories::IncomingCall) {
+              settingsController.SetLocked(false);
+            }
             if (IsSleeping()) {
               GoToRunning();
             }
