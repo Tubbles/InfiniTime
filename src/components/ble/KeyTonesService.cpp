@@ -17,25 +17,44 @@
 */
 
 #include "components/ble/KeyTonesService.h"
+#include "components/trace/Trace.h"
 #include "components/ble/NimbleController.h"
 #include "systemtask/SystemTask.h"
 
 using namespace Pinetime::Controllers;
 
-int KeyTonesCallback(uint16_t /*connHandle*/, uint16_t /*attrHandle*/, struct ble_gatt_access_ctxt* ctxt, void* arg) {
-  return static_cast<Pinetime::Controllers::KeyTonesService*>(arg)->OnCallState(ctxt);
+int KeyTonesCallback(uint16_t /*connHandle*/, uint16_t attrHandle, struct ble_gatt_access_ctxt* ctxt, void* arg) {
+  return static_cast<Pinetime::Controllers::KeyTonesService*>(arg)->OnCallState(attrHandle, ctxt);
 }
 
 KeyTonesService::KeyTonesService(NimbleController& nimble, Pinetime::System::SystemTask& systemTask)
   : nimble {nimble}, systemTask {systemTask} {
 }
 
-int KeyTonesService::OnCallState(struct ble_gatt_access_ctxt* ctxt) {
-  // The only readable characteristic in this service is the CCCD diagnostic;
-  // return the raw ble_gatts_diag snapshot (host/ble_gatt.h).
-  if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
-    int res = os_mbuf_append(ctxt->om, &ble_gatts_diag, sizeof(ble_gatts_diag));
-    return res == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+int KeyTonesService::OnCallState(uint16_t attributeHandle, struct ble_gatt_access_ctxt* ctxt) {
+  if (attributeHandle == diagHandle) {
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+      // Page the trace snapshot; before any snapshot (or after it is
+      // exhausted and re-read) fall back to the legacy CCCD diagnostic.
+      uint8_t chunk[200];
+      uint16_t length = Trace::ReadChunk(chunk, sizeof(chunk));
+      int res;
+      if (length > 0) {
+        res = os_mbuf_append(ctxt->om, chunk, length);
+      } else {
+        res = os_mbuf_append(ctxt->om, &ble_gatts_diag, sizeof(ble_gatts_diag));
+      }
+      return res == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+    }
+    if (ctxt->op == BLE_GATT_ACCESS_OP_WRITE_CHR && ctxt->om->om_len >= 1) {
+      if (ctxt->om->om_data[0] == 0x01) {
+        Trace::Snapshot();
+      } else if (ctxt->om->om_data[0] == 0x02) {
+        Trace::Snapshot();
+        nimble.FlushTraceToFile();
+      }
+    }
+    return 0;
   }
   // Otherwise only the call-state characteristic is writable; the key
   // characteristic never produces an access op.

@@ -577,6 +577,13 @@ ble_att_svr_tx_error_rsp(uint16_t conn_handle, struct os_mbuf *txom,
     rsp->baep_handle = htole16(handle);
     rsp->baep_error_code = error_code;
 
+    /* InfiniTime trace: every ATT error this server sends, with the request
+     * opcode, the attribute handle, and the error code. */
+    {
+        extern void infinitime_trace_event(uint8_t type, uint8_t a, uint16_t b, uint16_t c, uint16_t d);
+        infinitime_trace_event(1 /* AttErrorTx */, req_op, handle, error_code, conn_handle);
+    }
+
     return ble_att_tx(conn_handle, txom);
 }
 

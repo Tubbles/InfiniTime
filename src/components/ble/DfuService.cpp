@@ -1,4 +1,5 @@
 #include "components/ble/DfuService.h"
+#include "components/trace/Trace.h"
 #include <cstring>
 #include "components/ble/BleController.h"
 #include "components/ble/NotificationManager.h"
@@ -80,6 +81,11 @@ void DfuService::Init() {
 }
 
 int DfuService::OnServiceData(uint16_t connectionHandle, uint16_t attributeHandle, ble_gatt_access_ctxt* context) {
+  // Not the packet characteristic: a transfer is thousands of packet writes
+  // and would evict everything interesting from the trace ring.
+  if (attributeHandle != packetCharacteristicHandle) {
+    Trace::Event(Trace::Dfu, context->op, attributeHandle, 0, 0);
+  }
 #ifndef PINETIME_IS_RECOVERY
   if (systemTask.GetSettings().GetDfuAndFsMode() == Pinetime::Controllers::Settings::DfuAndFsMode::Disabled) {
     Pinetime::Controllers::NotificationManager::Notification notif;
@@ -122,6 +128,7 @@ int DfuService::OnServiceData(uint16_t connectionHandle, uint16_t attributeHandl
 }
 
 int DfuService::SendDfuRevision(os_mbuf* om) const {
+  Trace::Event(Trace::RevisionRead, 0, revision, 0, 0);
   int res = os_mbuf_append(om, &revision, sizeof(revision));
   return (res == 0) ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
 }

@@ -93,6 +93,11 @@ namespace Pinetime {
       void EnableRadio();
       void DisableRadio();
 
+    public:
+      // Persists the BLE trace snapshot to /trace.bin (components/trace).
+      // Runs on the host task; wakes the flash like PersistBond does.
+      void FlushTraceToFile();
+
     private:
       void PersistBond(struct ble_gap_conn_desc& desc);
       void RestoreBond();

@@ -1,5 +1,6 @@
 #include "components/ble/NimbleController.h"
 #include "Version.h"
+#include "components/trace/Trace.h"
 #include <cstring>
 
 #include <nrf_log.h>
@@ -178,6 +179,7 @@ void NimbleController::AnnounceGattChangeAfterFirmwareUpdate() {
   }
 
   gattLayoutChangedThisBoot = true;
+  Trace::Event(Trace::Announce, 1, 0, 0, 0);
   ble_svc_gatt_changed(0x0001, 0xffff);
 
   if (fs.FileOpen(&file_p, versionFile, LFS_O_WRONLY | LFS_O_CREAT | LFS_O_TRUNC) == 0) {
@@ -257,6 +259,7 @@ int NimbleController::OnGAPEvent(ble_gap_event* event) {
       } else {
         connectionHandle = event->connect.conn_handle;
         bleController.Connect();
+        Trace::Event(Trace::Gap, 1, event->connect.status, event->connect.conn_handle, 0);
         systemTask.PushMessage(Pinetime::System::Messages::BleConnected);
         // Service discovery is deferred via systemtask
       }
@@ -274,6 +277,7 @@ int NimbleController::OnGAPEvent(ble_gap_event* event) {
       currentTimeClient.Reset();
       alertNotificationClient.Reset();
       connectionHandle = BLE_HS_CONN_HANDLE_NONE;
+      Trace::Event(Trace::Gap, 2, event->disconnect.reason, 0, 0);
       if (bleController.IsConnected()) {
         bleController.Disconnect();
         systemTask.PushMessage(Pinetime::System::Messages::BleDisconnected);
@@ -377,6 +381,11 @@ int NimbleController::OnGAPEvent(ble_gap_event* event) {
       // a new firmware gets the changed indication even if it paired freshly:
       // fresh pairings have been observed carrying a stale GATT cache. For a
       // genuinely fresh client this only costs one extra discovery.
+      Trace::Event(Trace::Subscribe,
+                   event->subscribe.reason,
+                   event->subscribe.attr_handle,
+                   event->subscribe.cur_notify | (event->subscribe.cur_indicate << 1),
+                   0);
       if (gattLayoutChangedThisBoot && event->subscribe.cur_indicate == 1) {
         if (serviceChangedValueHandle == 0) {
           static constexpr ble_uuid16_t gattServiceUuid {.u {.type = BLE_UUID_TYPE_16}, .value = 0x1801};
@@ -384,6 +393,7 @@ int NimbleController::OnGAPEvent(ble_gap_event* event) {
           ble_gatts_find_chr(&gattServiceUuid.u, &serviceChangedCharUuid.u, nullptr, &serviceChangedValueHandle);
         }
         if (event->subscribe.attr_handle == serviceChangedValueHandle) {
+          Trace::Event(Trace::Announce, 2, 0, 0, 0);
           ble_svc_gatt_changed(0x0001, 0xffff);
         }
       }
@@ -546,7 +556,18 @@ void NimbleController::PersistBond(struct ble_gap_conn_desc& desc) {
       fs.FileClose(&file_p);
     }
     systemTask.PushMessage(Pinetime::System::Messages::EnableSleeping);
+    Trace::Event(Trace::Bond, 1, peer_count, 0, 0);
   }
+}
+
+void NimbleController::FlushTraceToFile() {
+  /* Same flash wake dance as PersistBond. */
+  systemTask.PushMessage(Pinetime::System::Messages::DisableSleeping);
+  while (!systemTask.IsSleepDisabled()) {
+    vTaskDelay(pdMS_TO_TICKS(5));
+  }
+  Trace::FlushToFile(fs);
+  systemTask.PushMessage(Pinetime::System::Messages::EnableSleeping);
 }
 
 void NimbleController::RestoreBond() {
@@ -571,5 +592,6 @@ void NimbleController::RestoreBond() {
 
     fs.FileClose(&file_p);
     fs.FileDelete("/bond.dat");
+    Trace::Event(Trace::Bond, 2, peer_count, 0, 0);
   }
 }
