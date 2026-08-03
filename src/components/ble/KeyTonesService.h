@@ -54,7 +54,8 @@ namespace Pinetime {
 
     private:
       // Service 00080000-78fc-48fe-8e23-433b3a1942d0; the two low bytes select
-      // the 16-bit id within the group (service 0000, key 0001, call state 0002).
+      // the 16-bit id within the group (service 0000, key 0001, call state
+      // 0002, CCCD diagnostic 0003).
       static constexpr ble_uuid128_t CharUuid(uint8_t low, uint8_t high) {
         return ble_uuid128_t {.u = {.type = BLE_UUID_TYPE_128},
                               .value = {0xd0, 0x42, 0x19, 0x3a, 0x3b, 0x43, 0x23, 0x8e, 0xfe, 0x48, 0xfc, 0x78, low, high, 0x08, 0x00}};
@@ -63,14 +64,19 @@ namespace Pinetime {
       ble_uuid128_t keyTonesUuid {CharUuid(0x00, 0x00)};
       ble_uuid128_t keyCharUuid {CharUuid(0x01, 0x00)};
       ble_uuid128_t callStateCharUuid {CharUuid(0x02, 0x00)};
+      // Read returns the ble_gatts_diag snapshot (host/ble_gatt.h): the CCCD
+      // permission table captured at the last refused subscription, for
+      // reading out the field-failure state with e.g. nRF Connect.
+      ble_uuid128_t diagCharUuid {CharUuid(0x03, 0x00)};
 
-      const struct ble_gatt_chr_def characteristicDefinition[3] = {
+      const struct ble_gatt_chr_def characteristicDefinition[4] = {
         {.uuid = &keyCharUuid.u, .access_cb = KeyTonesCallback, .arg = this, .flags = BLE_GATT_CHR_F_NOTIFY, .val_handle = &keyHandle},
         {.uuid = &callStateCharUuid.u,
          .access_cb = KeyTonesCallback,
          .arg = this,
          .flags = BLE_GATT_CHR_F_WRITE,
          .val_handle = &callStateHandle},
+        {.uuid = &diagCharUuid.u, .access_cb = KeyTonesCallback, .arg = this, .flags = BLE_GATT_CHR_F_READ},
         {0}};
       const struct ble_gatt_svc_def serviceDefinition[2] = {
         {.type = BLE_GATT_SVC_TYPE_PRIMARY, .uuid = &keyTonesUuid.u, .characteristics = characteristicDefinition},

@@ -46,14 +46,6 @@ nimble_port_freertos_init(TaskFunction_t host_task_fn)
      * have separate task for NimBLE host, but since something needs to handle
      * default queue it is just easier to make separate task which does this.
      */
-    /*
-     * InfiniTime: raised from +600 words. The host task runs InfiniTime's
-     * bond persistence (NimbleController::PersistBond) on every disconnect,
-     * whose littlefs file writes sit on top of the GAP-event call depth; the
-     * old 720-word (2880 B) stack could transiently overrun into the
-     * adjacent heap allocation (the GATT clt_cfg pool), corrupting CCCD
-     * state until reboot. See pinetime-hacks doc/LOG.md 2026-08-03.
-     */
-    xTaskCreate(host_task_fn, "ble", configMINIMAL_STACK_SIZE + 1000,
+    xTaskCreate(host_task_fn, "ble", configMINIMAL_STACK_SIZE + 600,
                 NULL, 1, &host_task_h);
 }

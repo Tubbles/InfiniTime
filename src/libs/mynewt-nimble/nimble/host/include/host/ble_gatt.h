@@ -885,6 +885,32 @@ int ble_gatts_reset(void);
  */
 int ble_gatts_start(void);
 
+/* InfiniTime diagnostic: whenever the server refuses a CCCD write with
+ * ATT "Request Not Supported" (written flags not in the entry's allowed
+ * mask), it snapshots the connection's entire client-configuration table
+ * here, so the state behind field failures can be read out over a
+ * diagnostic characteristic. Last-writer-wins; fail_count accumulates.
+ */
+#define BLE_GATTS_DIAG_MAX_ENTRIES 16
+
+struct ble_gatts_diag_entry {
+    uint16_t chr_val_handle;
+    uint8_t allowed;
+    uint8_t flags;
+};
+
+struct ble_gatts_diag {
+    uint16_t fail_count;
+    uint16_t failed_handle;         /* chr value handle of the refused CCCD */
+    uint16_t failed_flags;          /* flags the peer tried to write */
+    uint8_t global_num_cfgable_chrs;
+    uint8_t conn_num_clt_cfgs;
+    uint8_t entry_count;
+    struct ble_gatts_diag_entry entries[BLE_GATTS_DIAG_MAX_ENTRIES];
+};
+
+extern struct ble_gatts_diag ble_gatts_diag;
+
 #ifdef __cplusplus
 }
 #endif

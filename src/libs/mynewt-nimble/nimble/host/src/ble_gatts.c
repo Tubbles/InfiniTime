@@ -581,6 +581,38 @@ ble_gatts_register_dsc(const struct ble_gatt_svc_def *svc,
 
 }
 
+/* InfiniTime diagnostic: last refused CCCD write, with the connection's full
+ * permission table as it was at that moment. Read out through a diagnostic
+ * GATT characteristic (KeyTonesService). Single buffer, last-writer-wins;
+ * the count survives so repeated failures are visible.
+ */
+struct ble_gatts_diag ble_gatts_diag;
+
+static void
+ble_gatts_diag_snapshot(uint16_t chr_val_handle, uint16_t flags,
+                        const struct ble_gatts_clt_cfg *cfgs, int num_cfgs)
+{
+    int i;
+
+    ble_gatts_diag.fail_count++;
+    ble_gatts_diag.failed_handle = chr_val_handle;
+    ble_gatts_diag.failed_flags = flags;
+    ble_gatts_diag.global_num_cfgable_chrs = (uint8_t)ble_gatts_num_cfgable_chrs;
+    ble_gatts_diag.conn_num_clt_cfgs = (uint8_t)num_cfgs;
+
+    ble_gatts_diag.entry_count = 0;
+    if (cfgs == NULL) {
+        return;
+    }
+    for (i = 0; i < ble_gatts_num_cfgable_chrs &&
+                i < BLE_GATTS_DIAG_MAX_ENTRIES; i++) {
+        ble_gatts_diag.entries[i].chr_val_handle = cfgs[i].chr_val_handle;
+        ble_gatts_diag.entries[i].allowed = cfgs[i].allowed;
+        ble_gatts_diag.entries[i].flags = cfgs[i].flags;
+        ble_gatts_diag.entry_count++;
+    }
+}
+
 static int
 ble_gatts_clt_cfg_find_idx(struct ble_gatts_clt_cfg *cfgs,
                            uint16_t chr_val_handle)
@@ -708,6 +740,16 @@ ble_gatts_clt_cfg_access_locked(struct ble_hs_conn *conn, uint16_t attr_handle,
 
         flags = get_le16(om->om_data);
         if ((flags & ~clt_cfg->allowed) != 0) {
+            /* InfiniTime diagnostic: snapshot the live per-connection CCCD
+             * permission table at the exact moment of refusal, so the
+             * corrupt state behind field failures (DFU enable refused while
+             * the ATT table advertises notify; pinetime-hacks doc/LOG.md
+             * 2026-08-03) can be read out afterwards over a diagnostic
+             * characteristic instead of theorized about.
+             */
+            ble_gatts_diag_snapshot(chr_val_handle, flags,
+                                    conn->bhc_gatt_svr.clt_cfgs,
+                                    conn->bhc_gatt_svr.num_clt_cfgs);
             return BLE_ATT_ERR_REQ_NOT_SUPPORTED;
         }
 

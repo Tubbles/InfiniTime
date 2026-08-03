@@ -31,8 +31,14 @@ KeyTonesService::KeyTonesService(NimbleController& nimble, Pinetime::System::Sys
 }
 
 int KeyTonesService::OnCallState(struct ble_gatt_access_ctxt* ctxt) {
-  // Only the call-state characteristic is writable; the key characteristic
-  // never produces an access op.
+  // The only readable characteristic in this service is the CCCD diagnostic;
+  // return the raw ble_gatts_diag snapshot (host/ble_gatt.h).
+  if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+    int res = os_mbuf_append(ctxt->om, &ble_gatts_diag, sizeof(ble_gatts_diag));
+    return res == 0 ? 0 : BLE_ATT_ERR_INSUFFICIENT_RES;
+  }
+  // Otherwise only the call-state characteristic is writable; the key
+  // characteristic never produces an access op.
   if (ctxt->op != BLE_GATT_ACCESS_OP_WRITE_CHR) {
     return 0;
   }

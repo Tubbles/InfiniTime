@@ -487,17 +487,10 @@ void NimbleController::DisableRadio() {
 }
 
 void NimbleController::PersistBond(struct ble_gap_conn_desc& desc) {
-  // Static, NOT stack: ~750 B of ble_store unions on the BLE host task's
-  // small stack, on top of the GAP-dispatch depth plus the littlefs calls
-  // below, transiently overran into the adjacent heap allocation (the GATT
-  // clt_cfg pool) and corrupted per-connection CCCD state until reboot
-  // (doc/LOG.md 2026-08-03). This function only ever runs on the host task,
-  // so a static buffer is race-free.
-  static union ble_store_key key;
-  static union ble_store_value our_sec, peer_sec, peer_cccd_set[MYNEWT_VAL(BLE_STORE_MAX_CCCDS)];
+  union ble_store_key key;
+  union ble_store_value our_sec, peer_sec, peer_cccd_set[MYNEWT_VAL(BLE_STORE_MAX_CCCDS)] = {0};
   int rc;
 
-  memset(peer_cccd_set, 0, sizeof peer_cccd_set);
   memset(&key, 0, sizeof key);
   memset(&our_sec, 0, sizeof our_sec);
   key.sec.peer_addr = desc.peer_id_addr;
