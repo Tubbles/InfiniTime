@@ -79,7 +79,11 @@
 /* Hook function related definitions. */
 #define configUSE_IDLE_HOOK            0
 #define configUSE_TICK_HOOK            0
-#define configCHECK_FOR_STACK_OVERFLOW 1
+// Method 2 (canary check at context switch) instead of 1 (stack-pointer
+// sample only): a transient spike that overflows and returns between
+// switches is invisible to method 1, which is how the BLE host task's
+// overflow went undetected. Method 2's canary survives the excursion.
+#define configCHECK_FOR_STACK_OVERFLOW 2
 #define configUSE_MALLOC_FAILED_HOOK   1
 
 /* Run time and task stats gathering related definitions. */
