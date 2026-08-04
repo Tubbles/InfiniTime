@@ -297,7 +297,7 @@ void WatchFaceCasioStyleG7710::Refresh() {
     // while locked, and the icon must be restored on unlock (the ctor only
     // sets it once).
     if (lockedState.Get()) {
-      lv_label_set_text_static(heartbeatIcon, Symbols::shieldAlt);
+      lv_label_set_text_static(heartbeatIcon, Symbols::lock);
       lv_obj_set_style_local_text_color(heartbeatIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
       lv_label_set_text_static(heartbeatValue, "");
     } else {
