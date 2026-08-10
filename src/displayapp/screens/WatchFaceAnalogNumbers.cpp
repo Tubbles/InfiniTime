@@ -14,7 +14,9 @@ using namespace Pinetime::Applications::Screens;
 namespace {
   constexpr int16_t HourLength = 70;
   constexpr int16_t MinuteLength = 90;
-  constexpr int16_t NumeralRadius = 100;
+  // Inside the tick ring: at 100 the wide numerals' corners reached the
+  // major ticks' inner ends (~114 from center).
+  constexpr int16_t NumeralRadius = 86;
 
   // LVGL sin isn't constexpr (though it could be if it were C++) so fix size here
   // All the types are hardcoded anyway and would need changing if the size changed
@@ -61,8 +63,11 @@ WatchFaceAnalogNumbers::WatchFaceAnalogNumbers(Controllers::DateTime& dateTimeCo
   sHour = 99;
   sMinute = 99;
 
+  // Full 360° scales (the stock Analog spans 300° with the gap at the
+  // top, under its lone "12" label). One extra line closes the circle:
+  // the first and last coincide.
   minor_scales = lv_linemeter_create(lv_scr_act(), nullptr);
-  lv_linemeter_set_scale(minor_scales, 300, 51);
+  lv_linemeter_set_scale(minor_scales, 360, 61);
   lv_linemeter_set_angle_offset(minor_scales, 180);
   lv_obj_set_size(minor_scales, 240, 240);
   lv_obj_align(minor_scales, nullptr, LV_ALIGN_CENTER, 0, 0);
@@ -72,7 +77,7 @@ WatchFaceAnalogNumbers::WatchFaceAnalogNumbers(Controllers::DateTime& dateTimeCo
   lv_obj_set_style_local_scale_end_color(minor_scales, LV_LINEMETER_PART_MAIN, LV_STATE_DEFAULT, LV_COLOR_GRAY);
 
   major_scales = lv_linemeter_create(lv_scr_act(), nullptr);
-  lv_linemeter_set_scale(major_scales, 300, 11);
+  lv_linemeter_set_scale(major_scales, 360, 13);
   lv_linemeter_set_angle_offset(major_scales, 180);
   lv_obj_set_size(major_scales, 240, 240);
   lv_obj_align(major_scales, nullptr, LV_ALIGN_CENTER, 0, 0);
@@ -106,6 +111,10 @@ WatchFaceAnalogNumbers::WatchFaceAnalogNumbers(Controllers::DateTime& dateTimeCo
   lv_label_set_text_static(notificationIcon, NotificationIcon::GetIcon(false));
   lv_obj_align(notificationIcon, nullptr, LV_ALIGN_IN_TOP_LEFT, 0, 0);
 
+  lockIcon = lv_label_create(lv_scr_act(), nullptr);
+  lv_label_set_text_static(lockIcon, "");
+  lv_obj_align(lockIcon, nullptr, LV_ALIGN_IN_TOP_MID, 0, 0);
+
   // Date - Day / Week day
 
   label_date_day = lv_label_create(lv_scr_act(), nullptr);
@@ -115,33 +124,19 @@ WatchFaceAnalogNumbers::WatchFaceAnalogNumbers(Controllers::DateTime& dateTimeCo
   lv_obj_align(label_date_day, nullptr, LV_ALIGN_CENTER, 50, 0);
 
   minute_body = lv_line_create(lv_scr_act(), nullptr);
-  minute_body_trace = lv_line_create(lv_scr_act(), nullptr);
   hour_body = lv_line_create(lv_scr_act(), nullptr);
-  hour_body_trace = lv_line_create(lv_scr_act(), nullptr);
 
   lv_style_init(&minute_line_style);
-  lv_style_set_line_width(&minute_line_style, LV_STATE_DEFAULT, 7);
+  lv_style_set_line_width(&minute_line_style, LV_STATE_DEFAULT, 3);
   lv_style_set_line_color(&minute_line_style, LV_STATE_DEFAULT, LV_COLOR_WHITE);
   lv_style_set_line_rounded(&minute_line_style, LV_STATE_DEFAULT, true);
   lv_obj_add_style(minute_body, LV_LINE_PART_MAIN, &minute_line_style);
 
-  lv_style_init(&minute_line_style_trace);
-  lv_style_set_line_width(&minute_line_style_trace, LV_STATE_DEFAULT, 3);
-  lv_style_set_line_color(&minute_line_style_trace, LV_STATE_DEFAULT, LV_COLOR_WHITE);
-  lv_style_set_line_rounded(&minute_line_style_trace, LV_STATE_DEFAULT, false);
-  lv_obj_add_style(minute_body_trace, LV_LINE_PART_MAIN, &minute_line_style_trace);
-
   lv_style_init(&hour_line_style);
-  lv_style_set_line_width(&hour_line_style, LV_STATE_DEFAULT, 7);
+  lv_style_set_line_width(&hour_line_style, LV_STATE_DEFAULT, 3);
   lv_style_set_line_color(&hour_line_style, LV_STATE_DEFAULT, LV_COLOR_WHITE);
   lv_style_set_line_rounded(&hour_line_style, LV_STATE_DEFAULT, true);
   lv_obj_add_style(hour_body, LV_LINE_PART_MAIN, &hour_line_style);
-
-  lv_style_init(&hour_line_style_trace);
-  lv_style_set_line_width(&hour_line_style_trace, LV_STATE_DEFAULT, 3);
-  lv_style_set_line_color(&hour_line_style_trace, LV_STATE_DEFAULT, LV_COLOR_WHITE);
-  lv_style_set_line_rounded(&hour_line_style_trace, LV_STATE_DEFAULT, false);
-  lv_obj_add_style(hour_body_trace, LV_LINE_PART_MAIN, &hour_line_style_trace);
 
   taskRefresh = lv_task_create(RefreshTaskCallback, LV_DISP_DEF_REFR_PERIOD, LV_TASK_PRIO_MID, this);
 
@@ -152,9 +147,7 @@ WatchFaceAnalogNumbers::~WatchFaceAnalogNumbers() {
   lv_task_del(taskRefresh);
 
   lv_style_reset(&hour_line_style);
-  lv_style_reset(&hour_line_style_trace);
   lv_style_reset(&minute_line_style);
-  lv_style_reset(&minute_line_style_trace);
 
   lv_obj_clean(lv_scr_act());
 }
@@ -165,14 +158,10 @@ void WatchFaceAnalogNumbers::UpdateClock() {
 
   if (sMinute != minute) {
     auto const angle = minute * 6;
-    minute_point[0] = CoordinateRelocate(30, angle);
+    minute_point[0] = CoordinateRelocate(5, angle);
     minute_point[1] = CoordinateRelocate(MinuteLength, angle);
 
-    minute_point_trace[0] = CoordinateRelocate(5, angle);
-    minute_point_trace[1] = CoordinateRelocate(31, angle);
-
     lv_line_set_points(minute_body, minute_point, 2);
-    lv_line_set_points(minute_body_trace, minute_point_trace, 2);
   }
 
   if (sHour != hour || sMinute != minute) {
@@ -180,14 +169,10 @@ void WatchFaceAnalogNumbers::UpdateClock() {
     sMinute = minute;
     auto const angle = (hour * 30 + minute / 2);
 
-    hour_point[0] = CoordinateRelocate(30, angle);
+    hour_point[0] = CoordinateRelocate(5, angle);
     hour_point[1] = CoordinateRelocate(HourLength, angle);
 
-    hour_point_trace[0] = CoordinateRelocate(5, angle);
-    hour_point_trace[1] = CoordinateRelocate(31, angle);
-
     lv_line_set_points(hour_body, hour_point, 2);
-    lv_line_set_points(hour_body_trace, hour_point_trace, 2);
   }
 }
 
@@ -228,6 +213,12 @@ void WatchFaceAnalogNumbers::Refresh() {
 
   if (notificationState.IsUpdated()) {
     lv_label_set_text_static(notificationIcon, NotificationIcon::GetIcon(notificationState.Get()));
+  }
+
+  lockedState = settingsController.IsLocked();
+  if (lockedState.IsUpdated()) {
+    lv_label_set_text_static(lockIcon, lockedState.Get() ? Symbols::lock : "");
+    lv_obj_realign(lockIcon);
   }
 
   currentDateTime = dateTimeController.CurrentDateTime();

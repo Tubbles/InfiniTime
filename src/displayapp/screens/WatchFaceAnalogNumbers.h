@@ -43,6 +43,7 @@ namespace Pinetime {
         Utility::DirtyValue<bool> bleState {};
         Utility::DirtyValue<std::chrono::time_point<std::chrono::system_clock, std::chrono::nanoseconds>> currentDateTime;
         Utility::DirtyValue<bool> notificationState {false};
+        Utility::DirtyValue<bool> lockedState {};
         Utility::DirtyValue<std::chrono::time_point<std::chrono::system_clock, std::chrono::days>> currentDate;
 
         lv_obj_t* minor_scales;
@@ -50,24 +51,19 @@ namespace Pinetime {
         lv_obj_t* numerals[12];
 
         lv_obj_t* hour_body;
-        lv_obj_t* hour_body_trace;
         lv_obj_t* minute_body;
-        lv_obj_t* minute_body_trace;
 
         lv_point_t hour_point[2];
-        lv_point_t hour_point_trace[2];
         lv_point_t minute_point[2];
-        lv_point_t minute_point_trace[2];
 
         lv_style_t hour_line_style;
-        lv_style_t hour_line_style_trace;
         lv_style_t minute_line_style;
-        lv_style_t minute_line_style_trace;
 
         lv_obj_t* label_date_day;
         lv_obj_t* plugIcon;
         lv_obj_t* notificationIcon;
         lv_obj_t* bleIcon;
+        lv_obj_t* lockIcon;
 
         BatteryIcon batteryIcon;
 
