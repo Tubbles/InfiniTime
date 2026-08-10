@@ -123,6 +123,9 @@ namespace Pinetime {
 
       Apps currentApp = Apps::None;
       Apps returnToApp = Apps::None;
+      // Swipe-left peek at the hardcoded secondary face (Analog 12);
+      // runtime-only, cleared on sleep so a wake shows the primary.
+      bool secondaryFaceActive = false;
       FullRefreshDirections returnDirection = FullRefreshDirections::None;
       TouchEvents returnTouchEvent = TouchEvents::None;
 

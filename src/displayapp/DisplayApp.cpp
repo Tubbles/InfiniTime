@@ -326,12 +326,18 @@ void DisplayApp::Refresh() {
           brightnessController.Set(Controllers::BrightnessController::Levels::Off);
         }
         // Since the active screen is not really an app, go back to Clock.
-        if (currentApp == Apps::Launcher || currentApp == Apps::Notifications || currentApp == Apps::QuickSettings ||
-            currentApp == Apps::Settings) {
-          LoadScreen(Apps::Clock, DisplayApp::FullRefreshDirections::None);
-          // Wait for the clock app to load before moving on.
-          while (!lv_task_handler()) {
-          };
+        // The secondary-face peek does not survive sleep either: clear it
+        // before the Clock load below reads it, so a wake shows the primary.
+        {
+          const bool secondaryFaceNeedsReset = currentApp == Apps::Clock && secondaryFaceActive;
+          secondaryFaceActive = false;
+          if (currentApp == Apps::Launcher || currentApp == Apps::Notifications || currentApp == Apps::QuickSettings ||
+              currentApp == Apps::Settings || secondaryFaceNeedsReset) {
+            LoadScreen(Apps::Clock, DisplayApp::FullRefreshDirections::None);
+            // Wait for the clock app to load before moving on.
+            while (!lv_task_handler()) {
+            };
+          }
         }
         // Clear any ongoing touch pressed events
         // Without this LVGL gets stuck in the pressed state and will keep refreshing the
@@ -458,7 +464,20 @@ void DisplayApp::Refresh() {
                 LoadNewScreen(Apps::Notifications, DisplayApp::FullRefreshDirections::Down);
                 break;
               case TouchEvents::SwipeRight:
-                LoadNewScreen(Apps::QuickSettings, DisplayApp::FullRefreshDirections::RightAnim);
+                if (secondaryFaceActive) {
+                  secondaryFaceActive = false;
+                  LoadNewScreen(Apps::Clock, DisplayApp::FullRefreshDirections::RightAnim);
+                } else {
+                  LoadNewScreen(Apps::QuickSettings, DisplayApp::FullRefreshDirections::RightAnim);
+                }
+                break;
+              case TouchEvents::SwipeLeft:
+                // Peek at the secondary face; pointless when it is already
+                // the chosen primary.
+                if (!secondaryFaceActive && settingsController.GetWatchFace() != WatchFace::AnalogNumbers) {
+                  secondaryFaceActive = true;
+                  LoadNewScreen(Apps::Clock, DisplayApp::FullRefreshDirections::LeftAnim);
+                }
                 break;
               case TouchEvents::DoubleTap:
                 PushMessageToSystemTask(System::Messages::GoToSleep);
@@ -476,7 +495,12 @@ void DisplayApp::Refresh() {
       case Messages::ButtonPushed:
         if (!currentScreen->OnButtonPushed()) {
           if (currentApp == Apps::Clock) {
-            PushMessageToSystemTask(System::Messages::GoToSleep);
+            if (secondaryFaceActive) {
+              secondaryFaceActive = false;
+              LoadNewScreen(Apps::Clock, DisplayApp::FullRefreshDirections::RightAnim);
+            } else {
+              PushMessageToSystemTask(System::Messages::GoToSleep);
+            }
           } else {
             LoadPreviousScreen();
           }
@@ -568,8 +592,9 @@ void DisplayApp::LoadScreen(Apps app, DisplayApp::FullRefreshDirections directio
                                                                  std::move(apps));
     } break;
     case Apps::Clock: {
-      const auto* watchFace = std::ranges::find_if(userWatchFaces, [this](const WatchFaceDescription& watchfaceDescription) {
-        return watchfaceDescription.watchFace == settingsController.GetWatchFace();
+      const auto activeFace = secondaryFaceActive ? WatchFace::AnalogNumbers : settingsController.GetWatchFace();
+      const auto* watchFace = std::ranges::find_if(userWatchFaces, [activeFace](const WatchFaceDescription& watchfaceDescription) {
+        return watchfaceDescription.watchFace == activeFace;
       });
       if (watchFace != userWatchFaces.end()) {
         currentScreen.reset(watchFace->create(controllers));
