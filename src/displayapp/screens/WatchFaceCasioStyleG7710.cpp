@@ -6,6 +6,7 @@
 #include "displayapp/screens/BleIcon.h"
 #include "displayapp/screens/NotificationIcon.h"
 #include "displayapp/screens/Symbols.h"
+#include "displayapp/InfiniTimeTheme.h"
 #include "components/battery/BatteryController.h"
 #include "components/ble/BleController.h"
 #include "components/ble/NotificationManager.h"
@@ -232,8 +233,16 @@ void WatchFaceCasioStyleG7710::Refresh() {
   lv_obj_realign(notificationIcon);
 
   notificationState = notificatioManager.AreNewNotificationsAvailable();
-  if (notificationState.IsUpdated()) {
-    lv_label_set_text_static(notificationIcon, NotificationIcon::GetIcon(notificationState.Get()));
+  notificationsPresent = !notificatioManager.IsEmpty();
+  if (notificationState.IsUpdated() || notificationsPresent.IsUpdated()) {
+    // Three states: new notifications pop in the face color, merely
+    // stored (read) ones show a dim gray "i", none hides it.
+    if (notificationState.Get()) {
+      lv_obj_set_style_local_text_color(notificationIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+    } else {
+      lv_obj_set_style_local_text_color(notificationIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, Colors::gray);
+    }
+    lv_label_set_text_static(notificationIcon, NotificationIcon::GetIcon(notificationState.Get() || notificationsPresent.Get()));
   }
 
   currentDateTime = std::chrono::time_point_cast<std::chrono::minutes>(dateTimeController.CurrentDateTime());

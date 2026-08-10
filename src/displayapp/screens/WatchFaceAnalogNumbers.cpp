@@ -210,9 +210,16 @@ void WatchFaceAnalogNumbers::Refresh() {
   }
 
   notificationState = notificationManager.AreNewNotificationsAvailable();
-
-  if (notificationState.IsUpdated()) {
-    lv_label_set_text_static(notificationIcon, NotificationIcon::GetIcon(notificationState.Get()));
+  notificationsPresent = !notificationManager.IsEmpty();
+  if (notificationState.IsUpdated() || notificationsPresent.IsUpdated()) {
+    // Three states: new notifications pop in lime, merely stored (read)
+    // ones show a dim gray "i", none hides it.
+    if (notificationState.Get()) {
+      lv_obj_set_style_local_text_color(notificationIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, LV_COLOR_LIME);
+    } else {
+      lv_obj_set_style_local_text_color(notificationIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, Colors::gray);
+    }
+    lv_label_set_text_static(notificationIcon, NotificationIcon::GetIcon(notificationState.Get() || notificationsPresent.Get()));
   }
 
   lockedState = settingsController.IsLocked();
