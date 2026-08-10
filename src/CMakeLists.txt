@@ -426,6 +426,7 @@ list(APPEND SOURCE_FILES
 
         ## Watch faces
         displayapp/screens/WatchFaceAnalog.cpp
+        displayapp/screens/WatchFaceAnalogNumbers.cpp
         displayapp/screens/WatchFaceDigital.cpp
         displayapp/screens/WatchFaceInfineat.cpp
         displayapp/screens/WatchFaceTerminal.cpp

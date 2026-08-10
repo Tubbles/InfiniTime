@@ -58,6 +58,8 @@ namespace Pinetime {
       Infineat,
       CasioStyleG7710,
       PrideFlag,
+      // Values persist in settings as the selected face: append only.
+      AnalogNumbers,
     };
 
     template <Apps>
