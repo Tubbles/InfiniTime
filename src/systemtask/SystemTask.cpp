@@ -266,8 +266,11 @@ void SystemTask::Work() {
           displayApp.PushMessage(Pinetime::Applications::Display::Messages::CallEnded);
           break;
         case Messages::BleDisconnected:
-          // Warning buzz only; the screen stays as it is.
-          displayApp.PushMessage(Pinetime::Applications::Display::Messages::BleDisconnected);
+          // Warning buzz only; the screen stays as it is. Silent (Off) and
+          // Sleep notification modes suppress it.
+          if (settingsController.GetNotificationStatus() == Pinetime::Controllers::Settings::Notification::On) {
+            displayApp.PushMessage(Pinetime::Applications::Display::Messages::BleDisconnected);
+          }
           break;
         case Messages::BleConnected:
           displayApp.PushMessage(Pinetime::Applications::Display::Messages::NotifyDeviceActivity);
