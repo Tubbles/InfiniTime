@@ -136,6 +136,8 @@ namespace Pinetime {
       bool isBleDiscoveryTimerRunning = false;
       uint8_t bleDiscoveryTimer = 0;
       TimerHandle_t measureBatteryTimer;
+      TimerHandle_t bleDisconnectBuzzTimer;
+      TickType_t lastBleConnectedTick = 0;
       uint8_t wakeLocksHeld = 0;
       SystemTaskState state = SystemTaskState::Running;
 
@@ -146,6 +148,8 @@ namespace Pinetime {
       void GoToSleep();
       void UpdateMotion();
       static constexpr TickType_t batteryMeasurementPeriod = pdMS_TO_TICKS(10 * 60 * 1000);
+      static constexpr TickType_t bleDisconnectBuzzActivationDelay = pdMS_TO_TICKS(1000);
+      static constexpr TickType_t bleDisconnectBuzzRearmDelay = pdMS_TO_TICKS(5000);
 
       SystemMonitor monitor;
     };

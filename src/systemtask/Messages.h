@@ -32,7 +32,8 @@ namespace Pinetime {
       StopFileTransfer,
       BleRadioEnableToggle,
       CallStarted,
-      CallEnded
+      CallEnded,
+      BleDisconnectBuzzTimerExpired
     };
   }
 }

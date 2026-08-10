@@ -32,6 +32,11 @@ void MeasureBatteryTimerCallback(TimerHandle_t xTimer) {
   sysTask->PushMessage(Pinetime::System::Messages::MeasureBatteryTimerExpired);
 }
 
+void BleDisconnectBuzzTimerCallback(TimerHandle_t xTimer) {
+  auto* sysTask = static_cast<SystemTask*>(pvTimerGetTimerID(xTimer));
+  sysTask->PushMessage(Pinetime::System::Messages::BleDisconnectBuzzTimerExpired);
+}
+
 SystemTask::SystemTask(Drivers::SpiMaster& spi,
                        Pinetime::Drivers::SpiNorFlash& spiNorFlash,
                        Drivers::TwiMaster& twiMaster,
@@ -188,6 +193,7 @@ void SystemTask::Work() {
 
   measureBatteryTimer = xTimerCreate("measureBattery", batteryMeasurementPeriod, pdTRUE, this, MeasureBatteryTimerCallback);
   xTimerStart(measureBatteryTimer, portMAX_DELAY);
+  bleDisconnectBuzzTimer = xTimerCreate("bleDiscBuzz", bleDisconnectBuzzActivationDelay, pdFALSE, this, BleDisconnectBuzzTimerCallback);
 
   constexpr TickType_t stateUpdatePeriod = pdMS_TO_TICKS(100);
   // Stores when the state (motion, watchdog, time persistence etc) was last updated
@@ -266,13 +272,27 @@ void SystemTask::Work() {
           displayApp.PushMessage(Pinetime::Applications::Display::Messages::CallEnded);
           break;
         case Messages::BleDisconnected:
-          // Warning buzz only; the screen stays as it is. Silent (Off) and
-          // Sleep notification modes suppress it.
-          if (settingsController.GetNotificationStatus() == Pinetime::Controllers::Settings::Notification::On) {
+          // Delayed warning buzz: a blip that reconnects within the
+          // activation delay stays silent, and a disconnect during the
+          // re-arm cooldown after a reconnect does not start the timer,
+          // so connect/disconnect thrash cannot buzz repeatedly.
+          if (xTaskGetTickCount() - lastBleConnectedTick >= bleDisconnectBuzzRearmDelay) {
+            xTimerStart(bleDisconnectBuzzTimer, 0);
+          }
+          break;
+        case Messages::BleDisconnectBuzzTimerExpired:
+          // Still disconnected after the activation delay; the connection
+          // re-check covers an expiry that raced a reconnect. Silent (Off)
+          // and Sleep notification modes suppress the buzz; the screen
+          // stays as it is.
+          if (!bleController.IsConnected() &&
+              settingsController.GetNotificationStatus() == Pinetime::Controllers::Settings::Notification::On) {
             displayApp.PushMessage(Pinetime::Applications::Display::Messages::BleDisconnected);
           }
           break;
         case Messages::BleConnected:
+          xTimerStop(bleDisconnectBuzzTimer, 0);
+          lastBleConnectedTick = xTaskGetTickCount();
           displayApp.PushMessage(Pinetime::Applications::Display::Messages::NotifyDeviceActivity);
           isBleDiscoveryTimerRunning = true;
           bleDiscoveryTimer = 5;
