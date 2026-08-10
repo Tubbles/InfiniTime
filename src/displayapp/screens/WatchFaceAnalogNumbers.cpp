@@ -113,7 +113,7 @@ WatchFaceAnalogNumbers::WatchFaceAnalogNumbers(Controllers::DateTime& dateTimeCo
 
   lockIcon = lv_label_create(lv_scr_act(), nullptr);
   lv_label_set_text_static(lockIcon, "");
-  lv_obj_align(lockIcon, nullptr, LV_ALIGN_IN_TOP_MID, 0, 0);
+  lv_obj_align(lockIcon, nullptr, LV_ALIGN_IN_BOTTOM_LEFT, 0, 0);
 
   // Date - Day / Week day
 
