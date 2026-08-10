@@ -26,42 +26,48 @@
 using namespace Pinetime::Controllers;
 
 namespace {
-  constexpr uint16_t ringSize = 256;
+  // The heap is sized as all RAM left after static data
+  // (heap_4_infinitime.c), so every byte here comes out of it. The
+  // original 256-record ring plus a second copy buffer cost 6 KiB and
+  // starved the G7710 face's runtime font loads (doc/log/2026-08-10).
+  constexpr uint16_t ringSize = 64;
   Trace::Record ring[ringSize];
   uint16_t ringHead = 0;   // next slot to write
   uint32_t totalEvents = 0;
 
-  Trace::Record snapshotBuffer[ringSize];
+  // Readout pages straight out of the ring: while frozen, recording
+  // drops events so the pages stay stable across reads.
+  bool frozen = false;
   uint16_t snapshotCount = 0;
+  uint16_t snapshotOldest = 0;
   uint32_t readCursor = 0; // byte offset into header + records
   constexpr uint8_t headerSize = 8;
 }
 
 void Trace::Event(uint8_t type, uint8_t a, uint16_t b, uint16_t c, uint16_t d) {
   taskENTER_CRITICAL();
-  Record& record = ring[ringHead];
-  record.tick = xTaskGetTickCount();
-  record.type = type;
-  record.a = a;
-  record.b = b;
-  record.c = c;
-  record.d = d;
-  ringHead = (ringHead + 1) % ringSize;
-  totalEvents++;
+  if (!frozen) {
+    Record& record = ring[ringHead];
+    record.tick = xTaskGetTickCount();
+    record.type = type;
+    record.a = a;
+    record.b = b;
+    record.c = c;
+    record.d = d;
+    ringHead = (ringHead + 1) % ringSize;
+    totalEvents++;
+  }
   taskEXIT_CRITICAL();
 }
 
 uint16_t Trace::Snapshot() {
   taskENTER_CRITICAL();
-  const uint16_t count = totalEvents < ringSize ? ringHead : ringSize;
-  const uint16_t oldest = totalEvents < ringSize ? 0 : ringHead;
-  for (uint16_t index = 0; index < count; index++) {
-    snapshotBuffer[index] = ring[(oldest + index) % ringSize];
-  }
-  snapshotCount = count;
+  snapshotCount = totalEvents < ringSize ? ringHead : ringSize;
+  snapshotOldest = totalEvents < ringSize ? 0 : ringHead;
   readCursor = 0;
+  frozen = true;
   taskEXIT_CRITICAL();
-  return count;
+  return snapshotCount;
 }
 
 uint16_t Trace::ReadChunk(uint8_t* buffer, uint16_t maxLength) {
@@ -77,10 +83,15 @@ uint16_t Trace::ReadChunk(uint8_t* buffer, uint16_t maxLength) {
     if (readCursor < headerSize) {
       buffer[written] = header[readCursor];
     } else {
-      buffer[written] = reinterpret_cast<const uint8_t*>(snapshotBuffer)[readCursor - headerSize];
+      const uint32_t byteIndex = readCursor - headerSize;
+      const Record& record = ring[(snapshotOldest + byteIndex / sizeof(Record)) % ringSize];
+      buffer[written] = reinterpret_cast<const uint8_t*>(&record)[byteIndex % sizeof(Record)];
     }
     readCursor++;
     written++;
+  }
+  if (readCursor >= totalLength) {
+    frozen = false; // snapshot drained: resume recording
   }
   return written;
 }
@@ -97,7 +108,12 @@ int Trace::FlushToFile(Pinetime::Controllers::FS& fs) {
   header[6] = sizeof(Record) & 0xff;
   header[7] = sizeof(Record) >> 8;
   fs.FileWrite(&file, header, headerSize);
-  fs.FileWrite(&file, reinterpret_cast<const uint8_t*>(snapshotBuffer), snapshotCount * sizeof(Record));
+  // The window is at most two contiguous spans of the ring.
+  const uint16_t firstSpan = snapshotOldest + snapshotCount <= ringSize ? snapshotCount : ringSize - snapshotOldest;
+  fs.FileWrite(&file, reinterpret_cast<const uint8_t*>(&ring[snapshotOldest]), firstSpan * sizeof(Record));
+  if (firstSpan < snapshotCount) {
+    fs.FileWrite(&file, reinterpret_cast<const uint8_t*>(&ring[0]), (snapshotCount - firstSpan) * sizeof(Record));
+  }
   fs.FileClose(&file);
   return 0;
 }

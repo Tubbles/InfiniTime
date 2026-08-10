@@ -25,8 +25,11 @@ namespace Pinetime {
 
     // In-RAM BLE event trace for field debugging (doc/LOG.md 2026-08-03: the
     // DFU failures could not be attributed from phone-side logs alone). A
-    // fixed ring of 12-byte records; readout is paged through the KeyTones
-    // diagnostic characteristic, optionally persisted to /trace.bin.
+    // fixed 64-record ring of 12-byte records; readout is paged through the
+    // KeyTones diagnostic characteristic, optionally persisted to /trace.bin.
+    // Every static byte here shrinks the runtime heap (doc/log/2026-08-10),
+    // so the ring stays small and readout freezes it in place instead of
+    // copying it.
     namespace Trace {
       enum EventType : uint8_t {
         AttErrorTx = 1,   // a = ATT opcode, b = attribute handle, c = error code
@@ -49,14 +52,15 @@ namespace Pinetime {
 
       void Event(uint8_t type, uint8_t a, uint16_t b, uint16_t c, uint16_t d);
 
-      // Copies the ring (oldest first) into the readout buffer and rewinds
-      // the read cursor. Returns the number of records captured.
+      // Freezes the ring in place (recording drops events while frozen),
+      // fixes the readout window, and rewinds the read cursor. Returns the
+      // number of records captured.
       uint16_t Snapshot();
 
       // Pages the snapshot out: fills up to maxLength bytes, advances the
       // cursor, returns the number of bytes written (0 = done). The first
       // chunk starts with an 8-byte header: 'I','T','R','C', uint16 record
-      // count, uint16 record size.
+      // count, uint16 record size. Draining the snapshot resumes recording.
       uint16_t ReadChunk(uint8_t* buffer, uint16_t maxLength);
 
       // Persists the current snapshot to /trace.bin (header + records).
