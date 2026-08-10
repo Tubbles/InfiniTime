@@ -48,6 +48,20 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
     font_segment115 = lv_font_load("F:/fonts/7segments_115.bin");
   }
 
+  // A load can fail even when the file exists (heap exhaustion,
+  // doc/log/2026-08-10). Fall back to built-in fonts: wrong-sized but
+  // readable, instead of blank or garbage glyphs. The destructor must
+  // not free the built-ins.
+  if (font_dot40 == nullptr) {
+    font_dot40 = &jetbrains_mono_bold_20;
+  }
+  if (font_segment40 == nullptr) {
+    font_segment40 = &jetbrains_mono_bold_20;
+  }
+  if (font_segment115 == nullptr) {
+    font_segment115 = &jetbrains_mono_extrabold_compressed;
+  }
+
   label_battery_value = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_align(label_battery_value, lv_scr_act(), LV_ALIGN_IN_TOP_RIGHT, 0, 0);
   lv_obj_set_style_local_text_color(label_battery_value, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
@@ -178,15 +192,15 @@ WatchFaceCasioStyleG7710::~WatchFaceCasioStyleG7710() {
   lv_style_reset(&style_line);
   lv_style_reset(&style_border);
 
-  if (font_dot40 != nullptr) {
+  if (font_dot40 != nullptr && font_dot40 != &jetbrains_mono_bold_20) {
     lv_font_free(font_dot40);
   }
 
-  if (font_segment40 != nullptr) {
+  if (font_segment40 != nullptr && font_segment40 != &jetbrains_mono_bold_20) {
     lv_font_free(font_segment40);
   }
 
-  if (font_segment115 != nullptr) {
+  if (font_segment115 != nullptr && font_segment115 != &jetbrains_mono_extrabold_compressed) {
     lv_font_free(font_segment115);
   }
 
