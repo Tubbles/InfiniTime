@@ -531,10 +531,10 @@ void SystemTask::UpdateMotion() {
     if (raiseWake || shakeWake) {
       const bool wasSleeping = IsSleeping();
       GoToRunning();
-      if (wasSleeping && raiseWake) {
-        // A raise-wrist wake only shows the screen; touch stays rejected
-        // until the button is pressed (see HandleButtonAction). All other
-        // wake sources, including shake, come up unlocked.
+      if (wasSleeping) {
+        // A motion wake (raise or shake) only shows the screen; touch stays
+        // rejected until the button is pressed (see HandleButtonAction).
+        // Tap, button, and notification wakes come up unlocked.
         settingsController.SetLocked(true);
       }
     }
