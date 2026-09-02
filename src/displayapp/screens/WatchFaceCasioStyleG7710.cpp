@@ -7,6 +7,7 @@
 #include "displayapp/screens/NotificationIcon.h"
 #include "displayapp/screens/Symbols.h"
 #include "displayapp/InfiniTimeTheme.h"
+#include "components/alarm/AlarmController.h"
 #include "components/battery/BatteryController.h"
 #include "components/ble/BleController.h"
 #include "components/ble/NotificationManager.h"
@@ -18,6 +19,7 @@ using namespace Pinetime::Applications::Screens;
 WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTimeController,
                                                    const Controllers::Battery& batteryController,
                                                    const Controllers::Ble& bleController,
+                                                   const Controllers::AlarmController& alarmController,
                                                    Controllers::NotificationManager& notificatioManager,
                                                    Controllers::Settings& settingsController,
                                                    Controllers::HeartRateController& heartRateController,
@@ -28,6 +30,7 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
     dateTimeController {dateTimeController},
     batteryController {batteryController},
     bleController {bleController},
+    alarmController {alarmController},
     notificatioManager {notificatioManager},
     settingsController {settingsController},
     heartRateController {heartRateController},
@@ -172,6 +175,16 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
   lv_obj_set_style_local_text_color(heartbeatValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_label_set_text_static(heartbeatValue, "");
   lv_obj_align(heartbeatValue, heartbeatIcon, LV_ALIGN_OUT_RIGHT_MID, 5, 0);
+
+  alarmIcon = lv_label_create(lv_scr_act(), nullptr);
+  lv_obj_set_style_local_text_color(alarmIcon, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_label_set_text_static(alarmIcon, "");
+  lv_obj_align(alarmIcon, heartbeatIcon, LV_ALIGN_OUT_RIGHT_MID, 5, 0);
+
+  alarmValue = lv_label_create(lv_scr_act(), nullptr);
+  lv_obj_set_style_local_text_color(alarmValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
+  lv_label_set_text_static(alarmValue, "");
+  lv_obj_align(alarmValue, alarmIcon, LV_ALIGN_OUT_RIGHT_MID, 2, 0);
 
   stepValue = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_set_style_local_text_color(stepValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
@@ -336,6 +349,28 @@ void WatchFaceCasioStyleG7710::Refresh() {
 
     lv_obj_realign(heartbeatIcon);
     lv_obj_realign(heartbeatValue);
+  }
+
+  // Upcoming-alarm indicator: bell + HH:MM right of the heart-rate slot,
+  // shown while the watch's alarm is armed and due within 24 h (the window
+  // matters for Weekdays recurrence over a weekend). The heart-rate value
+  // owns the spot while it is displayed; the alarm yields to it.
+  const bool heartRateValueShown = heartbeatRunning.Get() && !lockedState.Get();
+  uint16_t alarmMinutes = noUpcomingAlarm;
+  if (!heartRateValueShown && alarmController.IsEnabled() && alarmController.SecondsToAlarm() <= 60 * 60 * 24) {
+    alarmMinutes = alarmController.Hours() * 60 + alarmController.Minutes();
+  }
+  upcomingAlarmMinutes = alarmMinutes;
+  if (upcomingAlarmMinutes.IsUpdated()) {
+    if (upcomingAlarmMinutes.Get() == noUpcomingAlarm) {
+      lv_label_set_text_static(alarmIcon, "");
+      lv_label_set_text_static(alarmValue, "");
+    } else {
+      lv_label_set_text_static(alarmIcon, Symbols::bell);
+      lv_label_set_text_fmt(alarmValue, "%02d:%02d", upcomingAlarmMinutes.Get() / 60, upcomingAlarmMinutes.Get() % 60);
+    }
+    lv_obj_realign(alarmIcon);
+    lv_obj_realign(alarmValue);
   }
 
   stepCount = motionController.NbSteps();
