@@ -227,13 +227,6 @@ void SystemTask::Work() {
           break;
         case Messages::GoToRunning:
           GoToRunning();
-          // Sole sender: DisplayApp's TimerDone handler, and only while the
-          // display is asleep. A ringing timer is silenced by touch or by
-          // backing out with the button, so it must come up unlocked. The
-          // clear belongs here rather than only in DisplayApp: that task
-          // runs its own clear before this message is even dequeued, so the
-          // wake above would re-lock it.
-          settingsController.SetLocked(false);
           break;
         case Messages::GoToSleep:
           GoToSleep();
@@ -248,32 +241,15 @@ void SystemTask::Work() {
             if (IsSleeping()) {
               GoToRunning();
             }
-            // A RINGING call needs touch (answer/reject), like the alarm and
-            // an established call. Without this, a locked watch swallows the
-            // answer tap, and the CallStarted unlock can never fire because
-            // answering is what triggers it. The clear has to come after the
-            // wake, which now sets the lock. Ordinary notifications stay
-            // view-only under the lock.
-            if (notificationManager.GetLastNotification().category ==
-                Pinetime::Controllers::NotificationManager::Categories::IncomingCall) {
-              settingsController.SetLocked(false);
-            }
             displayApp.PushMessage(Pinetime::Applications::Display::Messages::NewNotification);
           }
           break;
         case Messages::SetOffAlarm:
           GoToRunning();
-          // Clear the lock the wake just set: while locked, touch is rejected
-          // and the button only unlocks, so a locked alarm could not be
-          // dismissed.
-          settingsController.SetLocked(false);
           displayApp.PushMessage(Pinetime::Applications::Display::Messages::AlarmTriggered);
           break;
         case Messages::CallStarted:
-          // A call needs touch (hang up, DTMF keys): wake, then unlock what
-          // the wake locked, like the alarm does.
           GoToRunning();
-          settingsController.SetLocked(false);
           displayApp.PushMessage(Pinetime::Applications::Display::Messages::CallStarted);
           break;
         case Messages::CallEnded:
@@ -329,13 +305,8 @@ void SystemTask::Work() {
           // TODO add intent of fs access icon or something
           break;
         case Messages::OnTouchEvent:
-          // Wrist-raise lock: swallow the touch before it is even read. The
-          // touch IRQ is edge-triggered and re-asserts on the next touch, and
-          // a swallowed touch never resets the sleep timeout, so a stray
-          // raise-wake still dims and sleeps on its own.
-          if (state == SystemTaskState::Running && settingsController.IsLocked()) {
-            break;
-          }
+          // The lock does not gate here: whether touch is swallowed depends
+          // on the frontmost app, which only DisplayApp knows.
           // Finish immediately if no new events
           if (!touchHandler.ProcessTouchInfo(touchPanel.GetTouchInfo())) {
             break;
@@ -496,9 +467,8 @@ void SystemTask::GoToRunning() {
   }
 
   // Every wake locks the screen. Reaching this point means the state was not
-  // Running, so this is a real transition out of sleep; the exceptions
-  // (physical button, alarm, timer expiry, an established call) clear the
-  // lock again right after their GoToRunning call.
+  // Running, so this is a real transition out of sleep. The physical button
+  // is the one exception and clears the lock right after its own call.
   settingsController.SetLocked(true);
 
   displayApp.PushMessage(Pinetime::Applications::Display::Messages::GoToRunning);
@@ -561,17 +531,9 @@ void SystemTask::HandleButtonAction(Controllers::ButtonActions action) {
     return;
   }
 
+  // Pushed before the action is dispatched so that an unlocking press, which
+  // DisplayApp consumes, still resets the dim/sleep inactivity timer.
   displayApp.PushMessage(Pinetime::Applications::Display::Messages::NotifyDeviceActivity);
-
-  // Wrist-raise lock: the first resolved action only unlocks and is consumed,
-  // so it does not also act as back/sleep. Placed after NotifyDeviceActivity
-  // so the unlocking press also resets the dim/sleep inactivity timer.
-  if (settingsController.IsLocked()) {
-    if (action != Controllers::ButtonActions::None) {
-      settingsController.SetLocked(false);
-    }
-    return;
-  }
 
   using Actions = Controllers::ButtonActions;
 

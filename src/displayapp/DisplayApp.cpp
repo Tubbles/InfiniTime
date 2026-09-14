@@ -388,11 +388,6 @@ void DisplayApp::Refresh() {
         LoadNewScreen(Apps::NotificationsPreview, DisplayApp::FullRefreshDirections::Down);
         break;
       case Messages::TimerDone: {
-        // A ringing timer is silenced by touch or by backing out with the
-        // button, so it must not be locked. This clear covers the case where
-        // the display is already Running; when it is asleep, the wake below
-        // sets the lock and SystemTask's GoToRunning handler clears it.
-        settingsController.SetLocked(false);
         if (state != States::Running) {
           PushMessageToSystemTask(System::Messages::GoToRunning);
         }
@@ -435,6 +430,14 @@ void DisplayApp::Refresh() {
         break;
       case Messages::TouchEvent: {
         if (state != States::Running) {
+          break;
+        }
+        if (IsInputLocked()) {
+          // Drop the event before it is cached for LVGL, which is the only
+          // state the indev callback ever reads. The gesture is still
+          // consumed so a swipe made under the lock cannot surface on the
+          // first touch after unlocking.
+          touchHandler.GestureGet();
           break;
         }
         lvgl.SetNewTouchPoint(touchHandler.GetX(), touchHandler.GetY(), touchHandler.IsTouching());
@@ -494,6 +497,9 @@ void DisplayApp::Refresh() {
         }
       } break;
       case Messages::ButtonPushed:
+        if (ConsumeButtonWhileLocked()) {
+          break;
+        }
         if (!currentScreen->OnButtonPushed()) {
           if (currentApp == Apps::Clock) {
             if (secondaryFaceActive) {
@@ -508,6 +514,9 @@ void DisplayApp::Refresh() {
         }
         break;
       case Messages::ButtonLongPressed:
+        if (ConsumeButtonWhileLocked()) {
+          break;
+        }
         if (currentApp != Apps::Clock) {
           if (currentApp == Apps::Notifications) {
             LoadNewScreen(Apps::Clock, DisplayApp::FullRefreshDirections::Up);
@@ -521,10 +530,16 @@ void DisplayApp::Refresh() {
         }
         break;
       case Messages::ButtonLongerPressed:
+        if (ConsumeButtonWhileLocked()) {
+          break;
+        }
         // Create reboot app and open it instead
         LoadNewScreen(Apps::SysInfo, DisplayApp::FullRefreshDirections::Up);
         break;
       case Messages::ButtonDoubleClicked:
+        if (ConsumeButtonWhileLocked()) {
+          break;
+        }
         if (currentApp != Apps::Notifications && currentApp != Apps::NotificationsPreview) {
           LoadNewScreen(Apps::Notifications, DisplayApp::FullRefreshDirections::Down);
         }
@@ -543,7 +558,10 @@ void DisplayApp::Refresh() {
     }
   }
 
-  if (state == States::Running && touchHandler.IsTouching()) {
+  // The lock check matters here too: SystemTask keeps reading the panel
+  // while locked, so IsTouching() is live and the raw-coordinate apps
+  // (InfiniPaint, Paddle) would otherwise draw straight through the lock.
+  if (state == States::Running && touchHandler.IsTouching() && !IsInputLocked()) {
     currentScreen->OnTouchEvent(touchHandler.GetX(), touchHandler.GetY());
   }
 
@@ -803,6 +821,42 @@ void DisplayApp::Register(Pinetime::Controllers::KeyTonesService* keyTonesServic
 
 void DisplayApp::Register(Pinetime::Controllers::AlertNotificationService* alertService) {
   this->controllers.alertService = alertService;
+}
+
+// The lock rejects input everywhere except the screens that must stay usable
+// under it: a notification (an incoming call's answer/reject buttons live
+// there), the in-call screen with its keypad, and a ringing alarm or timer.
+// The lock itself survives the visit, so leaving an exempt app lands back on
+// a locked watch face.
+bool DisplayApp::IsInputLocked() {
+  if (!settingsController.IsLocked()) {
+    return false;
+  }
+  switch (currentApp) {
+    case Apps::Notifications:
+    case Apps::NotificationsPreview:
+    case Apps::InCall:
+      return false;
+    case Apps::Alarm:
+      return !alarmController.IsAlerting();
+    case Apps::Timer: {
+      auto timerStatus = timerController.GetTimerState();
+      return !(timerStatus && timerStatus->expired);
+    }
+    default:
+      return true;
+  }
+}
+
+// While the lock gates input, any button action only unlocks and is consumed,
+// so it does not also act as back/sleep. Returns true when the caller must
+// stop handling the action.
+bool DisplayApp::ConsumeButtonWhileLocked() {
+  if (!IsInputLocked()) {
+    return false;
+  }
+  settingsController.SetLocked(false);
+  return true;
 }
 
 void DisplayApp::ApplyBrightness() {
