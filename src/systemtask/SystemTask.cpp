@@ -227,6 +227,13 @@ void SystemTask::Work() {
           break;
         case Messages::GoToRunning:
           GoToRunning();
+          // Sole sender: DisplayApp's TimerDone handler, and only while the
+          // display is asleep. A ringing timer is silenced by touch or by
+          // backing out with the button, so it must come up unlocked. The
+          // clear belongs here rather than only in DisplayApp: that task
+          // runs its own clear before this message is even dequeued, so the
+          // wake above would re-lock it.
+          settingsController.SetLocked(false);
           break;
         case Messages::GoToSleep:
           GoToSleep();
@@ -238,33 +245,35 @@ void SystemTask::Work() {
           break;
         case Messages::OnNewNotification:
           if (settingsController.GetNotificationStatus() == Pinetime::Controllers::Settings::Notification::On) {
+            if (IsSleeping()) {
+              GoToRunning();
+            }
             // A RINGING call needs touch (answer/reject), like the alarm and
-            // an established call. Without this, a raise-locked watch swallows
-            // the answer tap, and the CallStarted unlock can never fire
-            // because answering is what triggers it. Ordinary notifications
-            // stay view-only under the lock.
+            // an established call. Without this, a locked watch swallows the
+            // answer tap, and the CallStarted unlock can never fire because
+            // answering is what triggers it. The clear has to come after the
+            // wake, which now sets the lock. Ordinary notifications stay
+            // view-only under the lock.
             if (notificationManager.GetLastNotification().category ==
                 Pinetime::Controllers::NotificationManager::Categories::IncomingCall) {
               settingsController.SetLocked(false);
-            }
-            if (IsSleeping()) {
-              GoToRunning();
             }
             displayApp.PushMessage(Pinetime::Applications::Display::Messages::NewNotification);
           }
           break;
         case Messages::SetOffAlarm:
-          // Clear the wrist-raise lock: while locked, touch is rejected and
-          // the button only unlocks, so a locked alarm could not be dismissed.
-          settingsController.SetLocked(false);
           GoToRunning();
+          // Clear the lock the wake just set: while locked, touch is rejected
+          // and the button only unlocks, so a locked alarm could not be
+          // dismissed.
+          settingsController.SetLocked(false);
           displayApp.PushMessage(Pinetime::Applications::Display::Messages::AlarmTriggered);
           break;
         case Messages::CallStarted:
-          // A call needs touch (hang up, DTMF keys): wake and unlock, like
-          // the alarm does.
-          settingsController.SetLocked(false);
+          // A call needs touch (hang up, DTMF keys): wake, then unlock what
+          // the wake locked, like the alarm does.
           GoToRunning();
+          settingsController.SetLocked(false);
           displayApp.PushMessage(Pinetime::Applications::Display::Messages::CallStarted);
           break;
         case Messages::CallEnded:
@@ -356,6 +365,9 @@ void SystemTask::Work() {
             if (IsSleeping()) {
               fastWakeUpDone = true;
               GoToRunning();
+              // The physical button is the one wake source that comes up
+              // unlocked, so undo the lock the wake just set.
+              settingsController.SetLocked(false);
               break;
             }
           }
@@ -483,6 +495,12 @@ void SystemTask::GoToRunning() {
     spiNorFlash.Wakeup();
   }
 
+  // Every wake locks the screen. Reaching this point means the state was not
+  // Running, so this is a real transition out of sleep; the exceptions
+  // (physical button, alarm, timer expiry, an established call) clear the
+  // lock again right after their GoToRunning call.
+  settingsController.SetLocked(true);
+
   displayApp.PushMessage(Pinetime::Applications::Display::Messages::GoToRunning);
   heartRateApp.PushMessage(Pinetime::Applications::HeartRateTask::Messages::WakeUp);
 
@@ -529,14 +547,7 @@ void SystemTask::UpdateMotion() {
     const bool shakeWake = settingsController.isWakeUpModeOn(Pinetime::Controllers::Settings::WakeUpMode::Shake) &&
                            motionController.CurrentShakeSpeed() > settingsController.GetShakeThreshold();
     if (raiseWake || shakeWake) {
-      const bool wasSleeping = IsSleeping();
       GoToRunning();
-      if (wasSleeping) {
-        // A motion wake (raise or shake) only shows the screen; touch stays
-        // rejected until the button is pressed (see HandleButtonAction).
-        // Tap, button, and notification wakes come up unlocked.
-        settingsController.SetLocked(true);
-      }
     }
   }
   if (settingsController.isWakeUpModeOn(Pinetime::Controllers::Settings::WakeUpMode::LowerWrist) && state == SystemTaskState::Running &&

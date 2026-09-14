@@ -388,9 +388,10 @@ void DisplayApp::Refresh() {
         LoadNewScreen(Apps::NotificationsPreview, DisplayApp::FullRefreshDirections::Down);
         break;
       case Messages::TimerDone: {
-        // Clear the wrist-raise lock here, not only in SystemTask's
-        // GoToRunning handler: that message is skipped when the display is
-        // already Running, which is the only state the lock can exist in.
+        // A ringing timer is silenced by touch or by backing out with the
+        // button, so it must not be locked. This clear covers the case where
+        // the display is already Running; when it is asleep, the wake below
+        // sets the lock and SystemTask's GoToRunning handler clears it.
         settingsController.SetLocked(false);
         if (state != States::Running) {
           PushMessageToSystemTask(System::Messages::GoToRunning);
