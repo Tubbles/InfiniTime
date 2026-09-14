@@ -515,7 +515,7 @@ void SystemTask::UpdateMotion() {
 
   if (settingsController.GetNotificationStatus() != Controllers::Settings::Notification::Sleep) {
     const bool raiseWake = settingsController.isWakeUpModeOn(Pinetime::Controllers::Settings::WakeUpMode::RaiseWrist) &&
-                           motionController.ShouldRaiseWake();
+                           motionController.ShouldRaiseWake(settingsController.GetRaiseWakeThresholds());
     const bool shakeWake = settingsController.isWakeUpModeOn(Pinetime::Controllers::Settings::WakeUpMode::Shake) &&
                            motionController.CurrentShakeSpeed() > settingsController.GetShakeThreshold();
     if (raiseWake || shakeWake) {
@@ -523,7 +523,7 @@ void SystemTask::UpdateMotion() {
     }
   }
   if (settingsController.isWakeUpModeOn(Pinetime::Controllers::Settings::WakeUpMode::LowerWrist) && state == SystemTaskState::Running &&
-      motionController.ShouldLowerSleep()) {
+      motionController.ShouldLowerSleep(settingsController.GetLowerSleepThresholds())) {
     GoToSleep();
   }
 }

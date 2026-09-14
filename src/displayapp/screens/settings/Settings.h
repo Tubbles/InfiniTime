@@ -52,9 +52,11 @@ namespace Pinetime {
           {Symbols::phone, "Intercom", Apps::SettingIntercom},
           {Symbols::list, "About", Apps::SysInfo},
 
-          // The motion and lock pages share the last page; trailing entries
-          // default to Apps::None, which List skips.
+          // The lock and motion pages share the last page; the trailing
+          // entry defaults to Apps::None, which List skips.
           {Symbols::lock, "Lock screen", Apps::SettingLockScreen},
+          {Symbols::eye, "Raise wrist", Apps::SettingRaiseWrist},
+          {Symbols::moon, "Lower wrist", Apps::SettingLowerWrist},
         }};
         ScreenList<nScreens> screens;
       };

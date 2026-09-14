@@ -65,13 +65,14 @@ void MotionController::Update(int16_t x, int16_t y, int16_t z, uint32_t nbSteps)
 
   // Update accumulated speed
   // Currently polling at 10Hz, if this ever goes faster scalar and EMA might need adjusting
-  int32_t speed = std::abs(zHistory[0] - zHistory[histSize - 1] + ((yHistory[0] - yHistory[histSize - 1]) / 2) +
-                           ((xHistory[0] - xHistory[histSize - 1]) / 4)) *
+  // Index [size - 1] is the sample from the previous tick whatever the buffer
+  // size is, so resizing the ring for the raise-wake window leaves the shake
+  // speed untouched.
+  int32_t speed = std::abs(zHistory[0] - zHistory[historySize - 1] + ((yHistory[0] - yHistory[historySize - 1]) / 2) +
+                           ((xHistory[0] - xHistory[historySize - 1]) / 4)) *
                   100 / (time - lastTime);
   // integer version of (.2 * speed) + ((1 - .2) * accumulatedSpeed);
   accumulatedSpeed = speed / 5 + accumulatedSpeed * 4 / 5;
-
-  stats = GetAccelStats();
 
   int32_t deltaSteps = nbSteps - oldSteps;
   if (deltaSteps > 0) {
@@ -80,41 +81,52 @@ void MotionController::Update(int16_t x, int16_t y, int16_t z, uint32_t nbSteps)
   SetSteps(Days::Today, nbSteps);
 }
 
-MotionController::AccelStats MotionController::GetAccelStats() const {
+MotionController::AccelStats MotionController::GetAccelStats(uint8_t window, uint8_t settle) const {
   AccelStats stats;
 
-  for (uint8_t i = 0; i < AccelStats::numHistory; i++) {
-    stats.xMean += xHistory[histSize - i];
-    stats.yMean += yHistory[histSize - i];
-    stats.zMean += zHistory[histSize - i];
-    stats.prevXMean += xHistory[1 + i];
-    stats.prevYMean += yHistory[1 + i];
-    stats.prevZMean += zHistory[1 + i];
-  }
-  stats.xMean /= AccelStats::numHistory;
-  stats.yMean /= AccelStats::numHistory;
-  stats.zMean /= AccelStats::numHistory;
-  stats.prevXMean /= AccelStats::numHistory;
-  stats.prevYMean /= AccelStats::numHistory;
-  stats.prevZMean /= AccelStats::numHistory;
+  // Index 0 is the newest sample and index [size - k] is k ticks ago, so the
+  // "now" group counts back from the newest and the "prev" group counts
+  // forward from window-1 ticks ago.
+  const uint8_t prevStart = historySize - window + 1;
 
-  for (uint8_t i = 0; i < AccelStats::numHistory; i++) {
-    stats.xVariance += (xHistory[histSize - i] - stats.xMean) * (xHistory[histSize - i] - stats.xMean);
-    stats.yVariance += (yHistory[histSize - i] - stats.yMean) * (yHistory[histSize - i] - stats.yMean);
-    stats.zVariance += (zHistory[histSize - i] - stats.zMean) * (zHistory[histSize - i] - stats.zMean);
+  for (uint8_t i = 0; i < settle; i++) {
+    stats.xMean += xHistory[historySize - i];
+    stats.yMean += yHistory[historySize - i];
+    stats.zMean += zHistory[historySize - i];
+    stats.prevXMean += xHistory[prevStart + i];
+    stats.prevYMean += yHistory[prevStart + i];
+    stats.prevZMean += zHistory[prevStart + i];
   }
-  stats.xVariance /= AccelStats::numHistory;
-  stats.yVariance /= AccelStats::numHistory;
-  stats.zVariance /= AccelStats::numHistory;
+  stats.xMean /= settle;
+  stats.yMean /= settle;
+  stats.zMean /= settle;
+  stats.prevXMean /= settle;
+  stats.prevYMean /= settle;
+  stats.prevZMean /= settle;
+
+  for (uint8_t i = 0; i < settle; i++) {
+    stats.xVariance += (xHistory[historySize - i] - stats.xMean) * (xHistory[historySize - i] - stats.xMean);
+    stats.yVariance += (yHistory[historySize - i] - stats.yMean) * (yHistory[historySize - i] - stats.yMean);
+    stats.zVariance += (zHistory[historySize - i] - stats.zMean) * (zHistory[historySize - i] - stats.zMean);
+  }
+  stats.xVariance /= settle;
+  stats.yVariance /= settle;
+  stats.zVariance /= settle;
 
   return stats;
 }
 
-bool MotionController::ShouldRaiseWake() const {
-  constexpr uint32_t varianceThresh = 56 * 56;
-  constexpr int16_t xThresh = 384;
-  constexpr int16_t yThresh = -64;
-  constexpr int16_t rollDegreesThresh = -45;
+bool MotionController::ShouldRaiseWake(const RaiseWakeThresholds& thresholds) const {
+  // Two independent sliders set the window and the settle count, so the
+  // relationship between them is enforced here rather than in the UI.
+  const uint8_t window = Clamp(thresholds.window, 2, historySize);
+  const uint8_t settle = Clamp(thresholds.settle, 1, window - 1);
+  const AccelStats stats = GetAccelStats(window, settle);
+
+  const uint32_t varianceThresh = static_cast<uint32_t>(thresholds.stillness) * thresholds.stillness;
+  const int16_t xThresh = thresholds.level;
+  const int16_t yThresh = -static_cast<int16_t>(thresholds.tilt);
+  const int16_t rollDegreesThresh = -static_cast<int16_t>(thresholds.rollDegrees);
 
   if (std::abs(stats.xMean) > xThresh) {
     return false;
@@ -128,18 +140,26 @@ bool MotionController::ShouldRaiseWake() const {
   return DegreesRolled(stats.yMean, stats.zMean, stats.prevYMean, stats.prevZMean) < rollDegreesThresh;
 }
 
-bool MotionController::ShouldLowerSleep() const {
-  if ((stats.xMean > 887 && DegreesRolled(stats.xMean, stats.zMean, stats.prevXMean, stats.prevZMean) > 30) ||
-      (stats.xMean < -887 && DegreesRolled(stats.xMean, stats.zMean, stats.prevXMean, stats.prevZMean) < -30)) {
+bool MotionController::ShouldLowerSleep(const LowerSleepThresholds& thresholds) const {
+  const AccelStats stats = GetAccelStats(lowerSleepWindow, lowerSleepSettle);
+
+  const int16_t sideLevel = thresholds.sideLevel;
+  const int16_t sideRollDegrees = thresholds.sideRollDegrees;
+
+  if ((stats.xMean > sideLevel && DegreesRolled(stats.xMean, stats.zMean, stats.prevXMean, stats.prevZMean) > sideRollDegrees) ||
+      (stats.xMean < -sideLevel && DegreesRolled(stats.xMean, stats.zMean, stats.prevXMean, stats.prevZMean) < -sideRollDegrees)) {
     return true;
   }
 
-  if (stats.yMean < 724 || DegreesRolled(stats.yMean, stats.zMean, stats.prevYMean, stats.prevZMean) < 30) {
+  if (stats.yMean < static_cast<int16_t>(thresholds.facingLevel) ||
+      DegreesRolled(stats.yMean, stats.zMean, stats.prevYMean, stats.prevZMean) < thresholds.rollDegrees) {
     return false;
   }
 
-  for (uint8_t i = AccelStats::numHistory + 1; i < yHistory.Size(); i++) {
-    if (yHistory[i] < 265) {
+  // Every sample between the two groups must also be raised: indices below
+  // this belong to the "prev" group, index 0 to the "now" group.
+  for (uint8_t i = historySize - lowerSleepWindow + lowerSleepSettle + 1; i < historySize; i++) {
+    if (yHistory[i] < static_cast<int16_t>(thresholds.historyFloor)) {
       return false;
     }
   }

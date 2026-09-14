@@ -6,6 +6,7 @@
 
 #include "drivers/Bma421.h"
 #include "components/ble/MotionService.h"
+#include "components/motion/MotionThresholds.h"
 #include "utility/CircularBuffer.h"
 
 namespace Pinetime {
@@ -53,8 +54,8 @@ namespace Pinetime {
         return currentTripSteps;
       }
 
-      bool ShouldRaiseWake() const;
-      bool ShouldLowerSleep() const;
+      bool ShouldRaiseWake(const RaiseWakeThresholds& thresholds) const;
+      bool ShouldLowerSleep(const LowerSleepThresholds& thresholds) const;
 
       int32_t CurrentShakeSpeed() const {
         return accumulatedSpeed;
@@ -86,8 +87,6 @@ namespace Pinetime {
       TickType_t time = 0;
 
       struct AccelStats {
-        static constexpr uint8_t numHistory = 2;
-
         int16_t xMean = 0;
         int16_t yMean = 0;
         int16_t zMean = 0;
@@ -100,14 +99,20 @@ namespace Pinetime {
         uint32_t zVariance = 0;
       };
 
-      AccelStats GetAccelStats() const;
+      // window = ring samples spanned between the two groups, settle = how
+      // many newest samples each group averages.
+      AccelStats GetAccelStats(uint8_t window, uint8_t settle) const;
 
-      AccelStats stats = {};
-
-      static constexpr uint8_t histSize = 8;
-      Utility::CircularBuffer<int16_t, histSize> xHistory = {};
-      Utility::CircularBuffer<int16_t, histSize> yHistory = {};
-      Utility::CircularBuffer<int16_t, histSize> zHistory = {};
+      // The buffer is sized for the largest window the raise-wake setting
+      // offers; the default window of 8 uses only the newest half of it.
+      static constexpr uint8_t historySize = 16;
+      // Lower wrist keeps the timing the algorithm always had. Only raise
+      // wake exposes its window, because that is the gesture people retune.
+      static constexpr uint8_t lowerSleepWindow = 8;
+      static constexpr uint8_t lowerSleepSettle = 2;
+      Utility::CircularBuffer<int16_t, historySize> xHistory = {};
+      Utility::CircularBuffer<int16_t, historySize> yHistory = {};
+      Utility::CircularBuffer<int16_t, historySize> zHistory = {};
       int32_t accumulatedSpeed = 0;
 
       DeviceTypes deviceType = DeviceTypes::Unknown;

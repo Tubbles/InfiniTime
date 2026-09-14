@@ -5,6 +5,7 @@
 #include <optional>
 #include "components/brightness/BrightnessController.h"
 #include "components/fs/FS.h"
+#include "components/motion/MotionThresholds.h"
 #include "displayapp/apps/Apps.h"
 #include <nrf_log.h>
 
@@ -338,6 +339,46 @@ namespace Pinetime {
         return settings.lockScreenEnabled;
       };
 
+      RaiseWakeThresholds GetRaiseWakeThresholds() const {
+        return {settings.raiseRollDegrees,
+                settings.raiseStillness,
+                settings.raiseLevel,
+                settings.raiseTilt,
+                settings.raiseWindow,
+                settings.raiseSettle};
+      };
+
+      void SetRaiseWakeThresholds(const RaiseWakeThresholds& thresholds) {
+        if (thresholds != GetRaiseWakeThresholds()) {
+          settingsChanged = true;
+        }
+        settings.raiseRollDegrees = thresholds.rollDegrees;
+        settings.raiseStillness = thresholds.stillness;
+        settings.raiseLevel = thresholds.level;
+        settings.raiseTilt = thresholds.tilt;
+        settings.raiseWindow = thresholds.window;
+        settings.raiseSettle = thresholds.settle;
+      };
+
+      LowerSleepThresholds GetLowerSleepThresholds() const {
+        return {settings.lowerSideLevel,
+                settings.lowerSideRollDegrees,
+                settings.lowerFacingLevel,
+                settings.lowerRollDegrees,
+                settings.lowerHistoryFloor};
+      };
+
+      void SetLowerSleepThresholds(const LowerSleepThresholds& thresholds) {
+        if (thresholds != GetLowerSleepThresholds()) {
+          settingsChanged = true;
+        }
+        settings.lowerSideLevel = thresholds.sideLevel;
+        settings.lowerSideRollDegrees = thresholds.sideRollDegrees;
+        settings.lowerFacingLevel = thresholds.facingLevel;
+        settings.lowerRollDegrees = thresholds.rollDegrees;
+        settings.lowerHistoryFloor = thresholds.historyFloor;
+      };
+
       void SetIntercomKey(char key) {
         if (key != settings.intercomKey) {
           settingsChanged = true;
@@ -431,6 +472,22 @@ namespace Pinetime {
         // default below. A bare bool would instead sit in the old layout's
         // trailing padding and load whatever that file carries there.
         alignas(4) bool lockScreenEnabled = true;
+
+        // Wrist gesture tuning, appended under the same rule. Defaults come
+        // from components/motion/MotionThresholds.h so the Reset buttons and
+        // these initializers cannot drift apart.
+        uint8_t raiseRollDegrees = raiseWakeDefaults.rollDegrees;
+        uint8_t raiseStillness = raiseWakeDefaults.stillness;
+        uint8_t raiseWindow = raiseWakeDefaults.window;
+        uint8_t raiseSettle = raiseWakeDefaults.settle;
+        uint16_t raiseLevel = raiseWakeDefaults.level;
+        uint16_t raiseTilt = raiseWakeDefaults.tilt;
+
+        uint8_t lowerSideRollDegrees = lowerSleepDefaults.sideRollDegrees;
+        uint8_t lowerRollDegrees = lowerSleepDefaults.rollDegrees;
+        uint16_t lowerSideLevel = lowerSleepDefaults.sideLevel;
+        uint16_t lowerFacingLevel = lowerSleepDefaults.facingLevel;
+        uint16_t lowerHistoryFloor = lowerSleepDefaults.historyFloor;
       };
 
       SettingsData settings;
