@@ -19,9 +19,14 @@ static void btnEventHandler(lv_obj_t* obj, lv_event_t event) {
 
 Timer::Timer(Controllers::Timer& timerController,
              Controllers::MotorController& motorController,
+             Controllers::Settings& settingsController,
              System::SystemTask& systemTask,
              Controllers::ClockSyncService* clockSyncService)
-  : timer {timerController}, motorController {motorController}, clockSyncService {clockSyncService}, wakeLock(systemTask) {
+  : timer {timerController},
+    motorController {motorController},
+    settingsController {settingsController},
+    clockSyncService {clockSyncService},
+    wakeLock(systemTask) {
 
   lv_obj_t* colonLabel = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_set_style_local_text_font(colonLabel, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, &jetbrains_mono_76);
@@ -65,6 +70,13 @@ Timer::Timer(Controllers::Timer& timerController,
 
   // Create the label as a child of the button so it stays centered by default
   txtPlayPause = lv_label_create(btnPlayPause, nullptr);
+
+  // The strip between the two counters is the only part of the layout nothing
+  // else claims: the counters fill the top corners and the colon starts well
+  // below the top edge.
+  lockIcon = lv_label_create(lv_scr_act(), nullptr);
+  lv_label_set_text_static(lockIcon, "");
+  lv_obj_align(lockIcon, lv_scr_act(), LV_ALIGN_IN_TOP_MID, 0, 0);
 
   auto timerStatus = timer.GetTimerState();
 
@@ -119,6 +131,12 @@ void Timer::UpdateMask() {
 }
 
 void Timer::Refresh() {
+  lockedState = settingsController.IsLocked();
+  if (lockedState.IsUpdated()) {
+    lv_label_set_text_static(lockIcon, lockedState.Get() ? Symbols::lock : "");
+    lv_obj_realign(lockIcon);
+  }
+
   auto timerStatus = timer.GetTimerState();
 
   if (timerStatus && timerStatus->expired) {

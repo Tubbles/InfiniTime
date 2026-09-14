@@ -10,6 +10,7 @@
 #include <lvgl/lvgl.h>
 
 #include "components/timer/Timer.h"
+#include "components/settings/Settings.h"
 #include "Symbols.h"
 
 namespace Pinetime::Applications {
@@ -18,6 +19,7 @@ namespace Pinetime::Applications {
     public:
       Timer(Controllers::Timer& timerController,
             Controllers::MotorController& motorController,
+            Controllers::Settings& settingsController,
             System::SystemTask& systemTask,
             Controllers::ClockSyncService* clockSyncService);
       ~Timer() override;
@@ -35,12 +37,16 @@ namespace Pinetime::Applications {
       void DisplayTime();
       Pinetime::Controllers::Timer& timer;
       Pinetime::Controllers::MotorController& motorController;
+      Pinetime::Controllers::Settings& settingsController;
       Pinetime::Controllers::ClockSyncService* clockSyncService;
 
       Pinetime::System::WakeLock wakeLock;
 
       lv_obj_t* btnPlayPause;
       lv_obj_t* txtPlayPause;
+      // The screen can be raise-woken into while the watch is locked, so it
+      // carries its own padlock like the watch faces do.
+      lv_obj_t* lockIcon;
 
       lv_obj_t* btnObjectMask;
       lv_obj_t* highlightObjectMask;
@@ -58,6 +64,7 @@ namespace Pinetime::Applications {
       lv_coord_t maskPosition = 0;
       TickType_t pressTime = 0;
       Utility::DirtyValue<std::chrono::seconds> displaySeconds;
+      Utility::DirtyValue<bool> lockedState {};
     };
   }
 
@@ -67,7 +74,11 @@ namespace Pinetime::Applications {
     static constexpr const char* icon = Screens::Symbols::hourGlass;
 
     static Screens::Screen* Create(AppControllers& controllers) {
-      return new Screens::Timer(controllers.timer, controllers.motorController, *controllers.systemTask, controllers.clockSyncService);
+      return new Screens::Timer(controllers.timer,
+                                controllers.motorController,
+                                controllers.settingsController,
+                                *controllers.systemTask,
+                                controllers.clockSyncService);
     };
 
     static bool IsAvailable(Pinetime::Controllers::FS& /*filesystem*/) {
