@@ -47,6 +47,7 @@ namespace Pinetime {
       SettingBluetooth,
       SettingOTA,
       SettingIntercom,
+      SettingLockScreen,
       Error
     };
 

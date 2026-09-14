@@ -469,7 +469,9 @@ void SystemTask::GoToRunning() {
   // Every wake locks the screen. Reaching this point means the state was not
   // Running, so this is a real transition out of sleep. The physical button
   // is the one exception and clears the lock right after its own call.
-  settingsController.SetLocked(true);
+  if (settingsController.GetLockScreenEnabled()) {
+    settingsController.SetLocked(true);
+  }
 
   displayApp.PushMessage(Pinetime::Applications::Display::Messages::GoToRunning);
   heartRateApp.PushMessage(Pinetime::Applications::HeartRateTask::Messages::WakeUp);

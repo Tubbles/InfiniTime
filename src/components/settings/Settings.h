@@ -321,6 +321,23 @@ namespace Pinetime {
         return locked;
       };
 
+      void SetLockScreenEnabled(bool enabled) {
+        if (enabled != settings.lockScreenEnabled) {
+          settingsChanged = true;
+        }
+        settings.lockScreenEnabled = enabled;
+        if (!enabled) {
+          // Switching the feature off has to release a lock that is live right
+          // now, or the user is left staring at a locked screen belonging to a
+          // feature they just turned off.
+          locked = false;
+        }
+      };
+
+      bool GetLockScreenEnabled() const {
+        return settings.lockScreenEnabled;
+      };
+
       void SetIntercomKey(char key) {
         if (key != settings.intercomKey) {
           settingsChanged = true;
@@ -405,6 +422,15 @@ namespace Pinetime {
 
         // In-call intercom button: 0 = off, else the ASCII key ('0'-'9', '*', '#')
         char intercomKey = 0;
+
+        // Appended 2026-09-14 without a settingsVersion bump, because a bump
+        // resets every setting on the watch. alignas(4) is what makes that
+        // safe: SettingsData is 4-byte aligned, so a 4-aligned member lands
+        // exactly at the previous sizeof, past every byte an older
+        // settings.dat holds, and LoadSettingsFromFile leaves it at the
+        // default below. A bare bool would instead sit in the old layout's
+        // trailing padding and load whatever that file carries there.
+        alignas(4) bool lockScreenEnabled = true;
       };
 
       SettingsData settings;

@@ -29,7 +29,7 @@ namespace Pinetime {
         static constexpr int entriesPerScreen = 4;
 
         // Increment this when more space is needed
-        static constexpr int nScreens = 4;
+        static constexpr int nScreens = 5;
 
         static constexpr std::array<List::Applications, entriesPerScreen * nScreens> entries {{
           {Symbols::sun, "Display", Apps::SettingDisplay},
@@ -51,6 +51,10 @@ namespace Pinetime {
           {Symbols::bluetooth, "Bluetooth", Apps::SettingBluetooth},
           {Symbols::phone, "Intercom", Apps::SettingIntercom},
           {Symbols::list, "About", Apps::SysInfo},
+
+          // The motion and lock pages share the last page; trailing entries
+          // default to Apps::None, which List skips.
+          {Symbols::lock, "Lock screen", Apps::SettingLockScreen},
         }};
         ScreenList<nScreens> screens;
       };
