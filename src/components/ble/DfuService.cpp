@@ -55,7 +55,10 @@ DfuService::DfuService(Pinetime::System::SystemTask& systemTask,
                                 .access_cb = DfuServiceCallback,
                                 .arg = this,
                                 .flags = BLE_GATT_CHR_F_READ,
-                                .val_handle = &revision,
+                                // NimBLE overwrites *val_handle with the attribute handle at registration, so pointing it at
+                                // revision served the handle instead of the revision. OnServiceData looks the handle up with
+                                // ble_gatts_find_chr anyway.
+                                .val_handle = nullptr,
 
                               },
                               {0}
