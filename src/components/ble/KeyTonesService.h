@@ -50,7 +50,7 @@ namespace Pinetime {
 
       void Init();
       void NotifyKey(char key);
-      int OnCallState(uint16_t attributeHandle, struct ble_gatt_access_ctxt* ctxt);
+      int OnCallState(uint16_t connectionHandle, uint16_t attributeHandle, struct ble_gatt_access_ctxt* ctxt);
 
     private:
       // Service 00080000-78fc-48fe-8e23-433b3a1942d0; the two low bytes select
@@ -66,10 +66,11 @@ namespace Pinetime {
       ble_uuid128_t callStateCharUuid {CharUuid(0x02, 0x00)};
       // Diagnostics (nRF Connect friendly). WRITE 0x01: snapshot the BLE
       // trace ring (components/trace) and rewind the read cursor; WRITE 0x02:
-      // also persist it to /trace.bin. READ: pages the snapshot out (~200 B
-      // per read, empty read = done); with no snapshot taken it returns the
-      // legacy ble_gatts_diag struct (host/ble_gatt.h), the CCCD permission
-      // table captured at the last refused subscription.
+      // also persist it to /trace.bin. READ: pages the snapshot out (one
+      // page of at most MTU-2 bytes per read, empty read = done); with no
+      // snapshot taken it returns the legacy ble_gatts_diag struct
+      // (host/ble_gatt.h), the CCCD permission table captured at the last
+      // refused subscription.
       ble_uuid128_t diagCharUuid {CharUuid(0x03, 0x00)};
 
       const struct ble_gatt_chr_def characteristicDefinition[4] = {

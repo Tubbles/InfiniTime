@@ -578,8 +578,16 @@ ble_att_svr_tx_error_rsp(uint16_t conn_handle, struct os_mbuf *txom,
     rsp->baep_error_code = error_code;
 
     /* InfiniTime trace: every ATT error this server sends, with the request
-     * opcode, the attribute handle, and the error code. */
-    {
+     * opcode, the attribute handle, and the error code. Service discovery
+     * closes every range it walks with ATTRIBUTE NOT FOUND, some 30 records
+     * per discovery in a 64-slot ring, so those terminators are skipped to
+     * leave room for the failures worth reading.
+     */
+    if (!(error_code == BLE_ATT_ERR_ATTR_NOT_FOUND &&
+          (req_op == BLE_ATT_OP_FIND_INFO_REQ ||
+           req_op == BLE_ATT_OP_FIND_TYPE_VALUE_REQ ||
+           req_op == BLE_ATT_OP_READ_TYPE_REQ ||
+           req_op == BLE_ATT_OP_READ_GROUP_TYPE_REQ))) {
         extern void infinitime_trace_event(uint8_t type, uint8_t a, uint16_t b, uint16_t c, uint16_t d);
         infinitime_trace_event(1 /* AttErrorTx */, req_op, handle, error_code, conn_handle);
     }

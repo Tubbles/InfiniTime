@@ -21,23 +21,31 @@
 #include "components/ble/NimbleController.h"
 #include "systemtask/SystemTask.h"
 
+// <algorithm> has to come after the nimble headers, which define min and max as macros.
+#include <algorithm>
+
 using namespace Pinetime::Controllers;
 
-int KeyTonesCallback(uint16_t /*connHandle*/, uint16_t attrHandle, struct ble_gatt_access_ctxt* ctxt, void* arg) {
-  return static_cast<Pinetime::Controllers::KeyTonesService*>(arg)->OnCallState(attrHandle, ctxt);
+int KeyTonesCallback(uint16_t connHandle, uint16_t attrHandle, struct ble_gatt_access_ctxt* ctxt, void* arg) {
+  return static_cast<Pinetime::Controllers::KeyTonesService*>(arg)->OnCallState(connHandle, attrHandle, ctxt);
 }
 
 KeyTonesService::KeyTonesService(NimbleController& nimble, Pinetime::System::SystemTask& systemTask)
   : nimble {nimble}, systemTask {systemTask} {
 }
 
-int KeyTonesService::OnCallState(uint16_t attributeHandle, struct ble_gatt_access_ctxt* ctxt) {
+int KeyTonesService::OnCallState(uint16_t connectionHandle, uint16_t attributeHandle, struct ble_gatt_access_ctxt* ctxt) {
   if (attributeHandle == diagHandle) {
     if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
       // Page the trace snapshot; before any snapshot (or after it is
       // exhausted and re-read) fall back to the legacy CCCD diagnostic.
+      // Android asks for a Read Blob continuation whenever a response is exactly MTU-1 bytes long, and NimBLE runs this
+      // callback again for every continuation, so a page above MTU-2 makes a single read swallow several pages and end
+      // in INVALID OFFSET (pinetime-hacks doc/log/2026-09-17.md).
       uint8_t chunk[200];
-      uint16_t length = Trace::ReadChunk(chunk, sizeof(chunk));
+      const uint16_t connectionMtu = ble_att_mtu(connectionHandle);
+      const uint16_t pageLength = std::min<uint16_t>(sizeof(chunk), connectionMtu > 22 ? connectionMtu - 2 : 20);
+      uint16_t length = Trace::ReadChunk(chunk, pageLength);
       int res;
       if (length > 0) {
         res = os_mbuf_append(ctxt->om, chunk, length);
