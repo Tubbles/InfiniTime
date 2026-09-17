@@ -3,8 +3,10 @@
 #include <libraries/gpiote/app_gpiote.h>
 #include <libraries/log/nrf_log.h>
 #include "BootloaderVersion.h"
+#include "Version.h"
 #include "components/battery/BatteryController.h"
 #include "components/ble/BleController.h"
+#include "components/eventlog/EventLog.h"
 #include "displayapp/TouchEvents.h"
 #include "drivers/Cst816s.h"
 #include "drivers/St7789.h"
@@ -17,6 +19,7 @@
 #include "main.h"
 #include "BootErrors.h"
 
+#include <cstdio>
 #include <memory>
 
 using namespace Pinetime::System;
@@ -122,6 +125,20 @@ void SystemTask::Work() {
   spiNorFlash.Wakeup();
 
   fs.Init();
+
+  Pinetime::Controllers::EventLog::Init(fs, dateTimeController, *this);
+  {
+    // A watchdog or lockup reset leaves no other trace the wearer can read,
+    // and the firmware it rebooted into is the other half of that story.
+    // The precisions keep the format bounded for -Wformat-truncation=2.
+    char bootText[64];
+    snprintf(bootText,
+             sizeof(bootText),
+             "boot %.16s reset=%.16s",
+             Pinetime::Version::GitCommitHash(),
+             Pinetime::Drivers::ResetReasonToString(watchdog.GetResetReason()));
+    Pinetime::Controllers::EventLog::Log(bootText);
+  }
 
   nimbleController.Init();
 

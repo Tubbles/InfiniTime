@@ -836,7 +836,9 @@ ble_gatts_clt_cfg_access(uint16_t conn_handle, uint16_t attr_handle,
          */
         if (rc != 0) {
             extern void infinitime_trace_event(uint8_t type, uint8_t a, uint16_t b, uint16_t c, uint16_t d);
+            extern void infinitime_event_cccd_persist_failed(uint16_t chr_val_handle, int status, uint16_t conn_handle);
             infinitime_trace_event(8 /* CccdPersistFailed */, 0, chr_val_handle, rc, conn_handle);
+            infinitime_event_cccd_persist_failed(chr_val_handle, rc, conn_handle);
             rc = 0;
         }
     }

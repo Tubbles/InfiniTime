@@ -467,6 +467,7 @@ list(APPEND SOURCE_FILES
         components/ble/ClockSyncService.cpp
         components/ble/KeyTonesService.cpp
         components/trace/Trace.cpp
+        components/eventlog/EventLog.cpp
         components/ble/NavigationService.cpp
         components/ble/BatteryInformationService.cpp
         components/ble/FSService.cpp
@@ -541,6 +542,7 @@ list(APPEND RECOVERY_SOURCE_FILES
         components/ble/ClockSyncService.cpp
         components/ble/KeyTonesService.cpp
         components/trace/Trace.cpp
+        components/eventlog/EventLog.cpp
         components/ble/BatteryInformationService.cpp
         components/ble/FSService.cpp
         components/ble/ImmediateAlertService.cpp

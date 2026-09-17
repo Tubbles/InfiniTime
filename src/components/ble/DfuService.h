@@ -161,6 +161,12 @@ namespace Pinetime {
       int WritePacketHandler(uint16_t connectionHandle, os_mbuf* om);
       int ControlPointHandler(uint16_t connectionHandle, os_mbuf* om);
 
+      // Short words for the event log, no table in static RAM.
+      static const char* StateToString(States state);
+      // Logs and notifies that a control point request arrived in a state
+      // that cannot serve it, which is how an aborted flash usually looks.
+      void LogWrongState(const char* operationName);
+
       TimerHandle_t timeoutTimer;
     };
   }

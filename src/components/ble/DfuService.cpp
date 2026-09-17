@@ -1,5 +1,7 @@
 #include "components/ble/DfuService.h"
+#include "components/eventlog/EventLog.h"
 #include "components/trace/Trace.h"
+#include <cstdio>
 #include <cstring>
 #include "components/ble/BleController.h"
 #include "components/ble/NotificationManager.h"
@@ -14,6 +16,12 @@ constexpr ble_uuid128_t DfuService::serviceUuid;
 constexpr ble_uuid128_t DfuService::controlPointCharacteristicUuid;
 constexpr ble_uuid128_t DfuService::revisionCharacteristicUuid;
 constexpr ble_uuid128_t DfuService::packetCharacteristicUuid;
+
+namespace {
+  // Event lines are built on the caller's stack, which is the BLE host task
+  // here. The widest line this file formats stays well under this.
+  constexpr size_t eventTextSize = 64;
+}
 
 int DfuServiceCallback(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt* ctxt, void* arg) {
   auto dfuService = static_cast<DfuService*>(arg);
@@ -148,6 +156,12 @@ int DfuService::WritePacketHandler(uint16_t connectionHandle, os_mbuf* om) {
                    bootloaderSize,
                    applicationSize);
 
+      {
+        char text[eventTextSize];
+        snprintf(text, sizeof(text), "DFU image %u bytes", static_cast<unsigned int>(applicationSize));
+        EventLog::Log(text);
+      }
+
       // Wait until SystemTask has disabled sleeping
       // This isn't quite correct, as we don't actually know
       // if BleFirmwareUpdateStarted has been received yet
@@ -225,6 +239,7 @@ int DfuService::ControlPointHandler(uint16_t connectionHandle, os_mbuf* om) {
     case Opcodes::StartDFU: {
       if (state != States::Idle && state != States::Start) {
         NRF_LOG_INFO("[DFU] -> Start DFU requested, but we are not in Idle state");
+        LogWrongState("start");
         return 0;
       }
       if (state == States::Start) {
@@ -234,6 +249,7 @@ int DfuService::ControlPointHandler(uint16_t connectionHandle, os_mbuf* om) {
       auto imageType = static_cast<ImageTypes>(om->om_data[1]);
       if (imageType == ImageTypes::Application) {
         NRF_LOG_INFO("[DFU] -> Start DFU, mode = Application");
+        EventLog::Log("DFU start");
         state = States::Start;
         bleController.StartFirmwareUpdate();
         bleController.State(Pinetime::Controllers::Ble::FirmwareUpdateStates::Running);
@@ -249,6 +265,7 @@ int DfuService::ControlPointHandler(uint16_t connectionHandle, os_mbuf* om) {
     case Opcodes::InitDFUParameters: {
       if (state != States::Init) {
         NRF_LOG_INFO("[DFU] -> Init DFU requested, but we are not in Init state");
+        LogWrongState("init");
         return 0;
       }
       bool isInitComplete = (om->om_data[1] != 0);
@@ -270,6 +287,7 @@ int DfuService::ControlPointHandler(uint16_t connectionHandle, os_mbuf* om) {
     case Opcodes::ReceiveFirmwareImage:
       if (state != States::Init) {
         NRF_LOG_INFO("[DFU] -> Receive firmware image requested, but we are not in Start Init");
+        LogWrongState("receive");
         return 0;
       }
       // TODO the chunk size is dependent of the implementation of the host application...
@@ -280,6 +298,7 @@ int DfuService::ControlPointHandler(uint16_t connectionHandle, os_mbuf* om) {
     case Opcodes::ValidateFirmware: {
       if (state != States::Validate) {
         NRF_LOG_INFO("[DFU] -> Validate firmware image requested, but we are not in Data state %d", state);
+        LogWrongState("validate");
         return 0;
       }
 
@@ -289,6 +308,7 @@ int DfuService::ControlPointHandler(uint16_t connectionHandle, os_mbuf* om) {
         state = States::Validated;
         bleController.State(Pinetime::Controllers::Ble::FirmwareUpdateStates::Validated);
         NRF_LOG_INFO("Image OK");
+        EventLog::Log("DFU image validated");
 
         uint8_t data[3] {static_cast<uint8_t>(Opcodes::Response),
                          static_cast<uint8_t>(Opcodes::ValidateFirmware),
@@ -296,6 +316,7 @@ int DfuService::ControlPointHandler(uint16_t connectionHandle, os_mbuf* om) {
         notificationManager.AsyncSend(connectionHandle, controlPointCharacteristicHandle, data, 3);
       } else {
         NRF_LOG_INFO("Image Error : bad CRC");
+        EventLog::LogAndNotify("DFU", "DFU image CRC error");
 
         uint8_t data[3] {static_cast<uint8_t>(Opcodes::Response),
                          static_cast<uint8_t>(Opcodes::ValidateFirmware),
@@ -310,9 +331,11 @@ int DfuService::ControlPointHandler(uint16_t connectionHandle, os_mbuf* om) {
     case Opcodes::ActivateImageAndReset:
       if (state != States::Validated) {
         NRF_LOG_INFO("[DFU] -> Activate image and reset requested, but we are not in Validated state");
+        LogWrongState("activate");
         return 0;
       }
       NRF_LOG_INFO("[DFU] -> Activate image and reset!");
+      EventLog::Log("DFU activate, rebooting");
       bleController.State(Pinetime::Controllers::Ble::FirmwareUpdateStates::Validated);
       Reset();
       return 0;
@@ -321,7 +344,44 @@ int DfuService::ControlPointHandler(uint16_t connectionHandle, os_mbuf* om) {
   }
 }
 
+const char* DfuService::StateToString(States state) {
+  switch (state) {
+    case States::Idle:
+      return "Idle";
+    case States::Init:
+      return "Init";
+    case States::Start:
+      return "Start";
+    case States::Data:
+      return "Data";
+    case States::Validate:
+      return "Validate";
+    case States::Validated:
+      return "Validated";
+  }
+  return "Unknown";
+}
+
+void DfuService::LogWrongState(const char* operationName) {
+  // The precisions keep the format bounded, which is what
+  // -Wformat-truncation=2 asks of a snprintf into a fixed buffer.
+  char text[eventTextSize];
+  snprintf(text, sizeof(text), "DFU %.8s in state %.9s", operationName, StateToString(state));
+  EventLog::LogAndNotify("DFU", text);
+}
+
 void DfuService::OnTimeout() {
+  // A phone that walks away mid transfer ends here too, so the percentage is
+  // the only hint of how far it got. Read before Reset clears the counters.
+  // Reset does not stop the timer, so it can also fire after a transfer has
+  // already been reset. An Idle timeout is nothing to report.
+  if (state != States::Idle) {
+    const unsigned int percentReceived = applicationSize > 0 ? static_cast<unsigned int>(bytesReceived * 100 / applicationSize) : 0;
+    char text[eventTextSize];
+    snprintf(text, sizeof(text), "DFU timeout in %.9s at %u %%", StateToString(state), percentReceived);
+    EventLog::LogAndNotify("DFU", text);
+  }
+
   bleController.State(Pinetime::Controllers::Ble::FirmwareUpdateStates::Error);
   Reset();
 }
