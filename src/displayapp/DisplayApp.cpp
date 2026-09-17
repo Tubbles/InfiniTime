@@ -50,6 +50,7 @@
 #include "displayapp/screens/settings/SettingChimes.h"
 #include "displayapp/screens/settings/SettingIntercom.h"
 #include "displayapp/screens/settings/SettingLockScreen.h"
+#include "displayapp/screens/settings/SettingEventLog.h"
 #include "displayapp/screens/settings/SettingMotionThresholds.h"
 #include "displayapp/screens/settings/SettingHeartRate.h"
 #include "displayapp/screens/settings/SettingShakeThreshold.h"
@@ -708,6 +709,9 @@ void DisplayApp::LoadScreen(Apps app, DisplayApp::FullRefreshDirections directio
       break;
     case Apps::SettingLockScreen:
       currentScreen = std::make_unique<Screens::SettingLockScreen>(settingsController);
+      break;
+    case Apps::SettingEventLog:
+      currentScreen = std::make_unique<Screens::SettingEventLog>(this, filesystem);
       break;
     case Apps::SettingRaiseWrist:
       currentScreen =

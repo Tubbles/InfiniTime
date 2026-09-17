@@ -58,6 +58,10 @@ namespace Pinetime {
       // nothing until it has run.
       void Init(Pinetime::Controllers::FS& fs, Pinetime::Controllers::DateTime& dateTime, Pinetime::System::SystemTask& systemTask);
 
+      // The file the lines land in, so that a reader (the Event log screen)
+      // does not have to repeat the path.
+      const char* LogPath();
+
       // Appends one timestamped line. Text that does not fit the line buffer
       // is truncated.
       void Log(const char* text);

@@ -48,6 +48,7 @@ namespace Pinetime {
       SettingOTA,
       SettingIntercom,
       SettingLockScreen,
+      SettingEventLog,
       SettingRaiseWrist,
       SettingLowerWrist,
       Error

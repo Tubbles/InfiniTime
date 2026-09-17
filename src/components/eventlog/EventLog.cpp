@@ -70,6 +70,10 @@ void EventLog::Init(Pinetime::Controllers::FS& fs, Pinetime::Controllers::DateTi
   systemTaskController = &systemTask;
 }
 
+const char* EventLog::LogPath() {
+  return logPath;
+}
+
 void EventLog::Log(const char* text) {
   if (fileSystem == nullptr || dateTimeController == nullptr) {
     return;

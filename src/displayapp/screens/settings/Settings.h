@@ -52,11 +52,12 @@ namespace Pinetime {
           {Symbols::phone, "Intercom", Apps::SettingIntercom},
           {Symbols::list, "About", Apps::SysInfo},
 
-          // The lock and motion pages share the last page; the trailing
-          // entry defaults to Apps::None, which List skips.
+          // The last page is full: one more entry here needs nScreens
+          // raised, or it falls off the end of the table.
           {Symbols::lock, "Lock screen", Apps::SettingLockScreen},
           {Symbols::eye, "Raise wrist", Apps::SettingRaiseWrist},
           {Symbols::moon, "Lower wrist", Apps::SettingLowerWrist},
+          {Symbols::info, "Event log", Apps::SettingEventLog},
         }};
         ScreenList<nScreens> screens;
       };

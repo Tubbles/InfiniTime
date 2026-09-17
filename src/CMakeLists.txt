@@ -421,6 +421,7 @@ list(APPEND SOURCE_FILES
         displayapp/screens/settings/SettingChimes.cpp
         displayapp/screens/settings/SettingIntercom.cpp
         displayapp/screens/settings/SettingLockScreen.cpp
+        displayapp/screens/settings/SettingEventLog.cpp
         displayapp/screens/settings/SettingMotionThresholds.cpp
         displayapp/screens/settings/SettingShakeThreshold.cpp
         displayapp/screens/settings/SettingBluetooth.cpp
