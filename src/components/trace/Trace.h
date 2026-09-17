@@ -32,13 +32,14 @@ namespace Pinetime {
     // copying it.
     namespace Trace {
       enum EventType : uint8_t {
-        AttErrorTx = 1,   // a = ATT opcode, b = attribute handle, c = error code
-        Subscribe = 2,    // a = reason, b = attribute handle, c = cur_notify | cur_indicate << 1
-        Announce = 3,     // a = 1 boot, 2 subscribe-triggered
-        Gap = 4,          // a = 1 connect, 2 disconnect, 3 enc change; b = status/reason
-        Bond = 5,         // a = 1 persist, 2 restore; b = CCCD count
-        Dfu = 6,          // a = GATT op, b = attribute handle
-        RevisionRead = 7, // b = revision value served
+        AttErrorTx = 1,        // a = ATT opcode, b = attribute handle, c = error code
+        Subscribe = 2,         // a = reason, b = attribute handle, c = cur_notify | cur_indicate << 1
+        Announce = 3,          // a = 1 boot, 2 subscribe-triggered
+        Gap = 4,               // a = 1 connect, 2 disconnect, 3 enc change; b = status/reason
+        Bond = 5,              // a = 1 persist, 2 restore; b = CCCD count
+        Dfu = 6,               // a = GATT op, b = attribute handle
+        RevisionRead = 7,      // b = revision value served
+        CccdPersistFailed = 8, // b = chr value handle, c = store status, d = conn handle
       };
 
       struct Record {

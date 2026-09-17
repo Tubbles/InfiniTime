@@ -823,6 +823,22 @@ ble_gatts_clt_cfg_access(uint16_t conn_handle, uint16_t attr_handle,
         } else {
             rc = ble_store_write_cccd(&cccd_value);
         }
+
+        /* InfiniTime fix: a failed persist must not fail the CCCD write.
+         * The subscription is already live for this connection, and
+         * persisting it only matters for restoring it after a reconnect.
+         * A store status is not an ATT error code either, yet upstream
+         * returns it here and ble_att_svr_write sends it verbatim as the
+         * ATT error byte, so a full CCCD store answered REQUEST NOT
+         * SUPPORTED and aborted every DFU. Trace the failure instead and
+         * keep the write successful.
+         * See pinetime-hacks doc/log/2026-09-17.md.
+         */
+        if (rc != 0) {
+            extern void infinitime_trace_event(uint8_t type, uint8_t a, uint16_t b, uint16_t c, uint16_t d);
+            infinitime_trace_event(8 /* CccdPersistFailed */, 0, chr_val_handle, rc, conn_handle);
+            rc = 0;
+        }
     }
 
     return rc;
