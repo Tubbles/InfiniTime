@@ -50,6 +50,7 @@ NimbleController::NimbleController(Pinetime::System::SystemTask& systemTask,
     weatherService {dateTimeController},
     clockSyncService {*this, dateTimeController, stopWatchController, timerController},
     keyTonesService {*this, systemTask},
+    hubService {dateTimeController},
     batteryInformationService {batteryController},
     immediateAlertService {systemTask, notificationManager},
     heartRateService {*this, heartRateController},
@@ -110,6 +111,7 @@ void NimbleController::Init() {
   // only ever be appended here.
   clockSyncService.Init();
   keyTonesService.Init();
+  hubService.Init();
 
   int rc;
   rc = ble_hs_util_ensure_addr(0);

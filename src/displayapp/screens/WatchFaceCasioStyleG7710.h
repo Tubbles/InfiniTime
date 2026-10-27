@@ -2,13 +2,16 @@
 
 #include <displayapp/screens/BatteryIcon.h>
 #include <lvgl/src/lv_core/lv_obj.h>
+#include <array>
 #include <chrono>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <displayapp/Controllers.h>
 #include "displayapp/screens/Screen.h"
 #include "components/datetime/DateTimeController.h"
 #include "components/ble/BleController.h"
+#include "components/ble/HubService.h"
 #include "utility/DirtyValue.h"
 #include "displayapp/apps/Apps.h"
 
@@ -32,6 +35,7 @@ namespace Pinetime {
                                  const Controllers::Battery& batteryController,
                                  const Controllers::Ble& bleController,
                                  const Controllers::AlarmController& alarmController,
+                                 Controllers::HubService* hubService,
                                  Controllers::NotificationManager& notificatioManager,
                                  Controllers::Settings& settingsController,
                                  Controllers::HeartRateController& heartRateController,
@@ -44,6 +48,26 @@ namespace Pinetime {
         static bool IsAvailable(Pinetime::Controllers::FS& filesystem);
 
       private:
+        enum class CornerKind : uint8_t { None, Alarm, Event };
+
+        // What the next-event corner shows; a change repaints it. The
+        // source and generation catch a new icon at an unchanged minute.
+        // Value-initialized, it reads None.
+        struct CornerContent {
+          CornerKind kind;
+          uint8_t sourceId;
+          uint16_t minutesOfDay;
+          uint8_t generation;
+
+          bool operator==(const CornerContent&) const = default;
+        };
+
+        CornerContent NextCornerContent(const std::optional<Controllers::HubService::Event>& event, uint32_t nowUtcSeconds) const;
+        void PaintCorner(const CornerContent& content, const std::optional<Controllers::HubService::Event>& event);
+        void ShowEventIcon(const Controllers::HubService::Event& event);
+        uint16_t LocalMinutesOfDay(uint32_t utcSeconds) const;
+        uint32_t NowUtcSeconds() const;
+
         Utility::DirtyValue<uint8_t> batteryPercentRemaining {};
         Utility::DirtyValue<bool> powerPresent {};
         Utility::DirtyValue<bool> bleState {};
@@ -53,8 +77,7 @@ namespace Pinetime {
         Utility::DirtyValue<uint8_t> heartbeat {};
         Utility::DirtyValue<bool> heartbeatRunning {};
         Utility::DirtyValue<bool> lockedState {};
-        static constexpr uint16_t noUpcomingAlarm = 0xFFFF;
-        Utility::DirtyValue<uint16_t> upcomingAlarmMinutes {noUpcomingAlarm};
+        Utility::DirtyValue<CornerContent> cornerContent {};
         Utility::DirtyValue<bool> notificationsPresent {};
         Utility::DirtyValue<bool> notificationState {};
         Utility::DirtyValue<std::chrono::time_point<std::chrono::system_clock, std::chrono::days>> currentDate;
@@ -87,6 +110,7 @@ namespace Pinetime {
         lv_obj_t* heartbeatIcon;
         lv_obj_t* heartbeatValue;
         lv_obj_t* alarmIcon;
+        lv_obj_t* eventIcon;
         lv_obj_t* alarmValue;
         lv_obj_t* stepIcon;
         lv_obj_t* stepValue;
@@ -95,10 +119,19 @@ namespace Pinetime {
 
         BatteryIcon batteryIcon;
 
+        // The face's own copy of the shown event icon: the BLE task may
+        // rewrite the service's slots at any time, and LVGL reads the
+        // pixels on every redraw. Palette first (index 0 transparent,
+        // index 1 color_text), then the rows.
+        static constexpr uint8_t eventIconPaletteSize = 2 * sizeof(lv_color32_t);
+        alignas(lv_color32_t) std::array<uint8_t, eventIconPaletteSize + Controllers::HubService::maximumBitmapSize> eventIconData {};
+        lv_img_dsc_t eventIconDescriptor {};
+
         Controllers::DateTime& dateTimeController;
         const Controllers::Battery& batteryController;
         const Controllers::Ble& bleController;
         const Controllers::AlarmController& alarmController;
+        Controllers::HubService* hubService;
         Controllers::NotificationManager& notificatioManager;
         Controllers::Settings& settingsController;
         Controllers::HeartRateController& heartRateController;
@@ -121,6 +154,7 @@ namespace Pinetime {
                                                      controllers.batteryController,
                                                      controllers.bleController,
                                                      controllers.alarmController,
+                                                     controllers.hubService,
                                                      controllers.notificationManager,
                                                      controllers.settingsController,
                                                      controllers.heartRateController,

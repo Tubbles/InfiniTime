@@ -2,6 +2,7 @@
 
 #include <lvgl/lvgl.h>
 #include <cstdio>
+#include <cstring>
 #include "displayapp/screens/BatteryIcon.h"
 #include "displayapp/screens/BleIcon.h"
 #include "displayapp/screens/NotificationIcon.h"
@@ -16,10 +17,17 @@
 #include "components/settings/Settings.h"
 using namespace Pinetime::Applications::Screens;
 
+namespace {
+  // HH:MM is ambiguous beyond a day; for the alarm the window also matters
+  // for Weekdays recurrence over a weekend.
+  constexpr uint32_t cornerWindowSeconds = 60 * 60 * 24;
+}
+
 WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTimeController,
                                                    const Controllers::Battery& batteryController,
                                                    const Controllers::Ble& bleController,
                                                    const Controllers::AlarmController& alarmController,
+                                                   Controllers::HubService* hubService,
                                                    Controllers::NotificationManager& notificatioManager,
                                                    Controllers::Settings& settingsController,
                                                    Controllers::HeartRateController& heartRateController,
@@ -31,6 +39,7 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
     batteryController {batteryController},
     bleController {bleController},
     alarmController {alarmController},
+    hubService {hubService},
     notificatioManager {notificatioManager},
     settingsController {settingsController},
     heartRateController {heartRateController},
@@ -181,6 +190,16 @@ WatchFaceCasioStyleG7710::WatchFaceCasioStyleG7710(Controllers::DateTime& dateTi
   lv_label_set_text_static(alarmIcon, "");
   lv_obj_align(alarmIcon, heartbeatIcon, LV_ALIGN_OUT_RIGHT_MID, 5, 0);
 
+  // Same spot as the bell; shown instead of it when a Hub event wins the
+  // corner. The palette never changes, the rows are copied in per event.
+  lv_color32_t palette[2];
+  palette[0].full = 0; // alpha 0: unset pixels let the face show through
+  palette[1].full = lv_color_to32(color_text);
+  std::memcpy(eventIconData.data(), palette, sizeof(palette));
+  eventIcon = lv_img_create(lv_scr_act(), nullptr);
+  lv_obj_set_hidden(eventIcon, true);
+  lv_obj_align(eventIcon, heartbeatIcon, LV_ALIGN_OUT_RIGHT_MID, 5, 0);
+
   alarmValue = lv_label_create(lv_scr_act(), nullptr);
   lv_obj_set_style_local_text_color(alarmValue, LV_LABEL_PART_MAIN, LV_STATE_DEFAULT, color_text);
   lv_label_set_text_static(alarmValue, "");
@@ -217,6 +236,10 @@ WatchFaceCasioStyleG7710::~WatchFaceCasioStyleG7710() {
   if (font_segment115 != nullptr && font_segment115 != &jetbrains_mono_extrabold_compressed) {
     lv_font_free(font_segment115);
   }
+
+  // The image cache matches by descriptor address; drop the entry before
+  // this face's memory can be reused by another image's descriptor.
+  lv_img_cache_invalidate_src(&eventIconDescriptor);
 
   lv_obj_clean(lv_scr_act());
 }
@@ -351,26 +374,20 @@ void WatchFaceCasioStyleG7710::Refresh() {
     lv_obj_realign(heartbeatValue);
   }
 
-  // Upcoming-alarm indicator: bell + HH:MM right of the heart-rate slot,
-  // shown while the watch's alarm is armed and due within 24 h (the window
-  // matters for Weekdays recurrence over a weekend). The heart-rate value
-  // owns the spot while it is displayed; the alarm yields to it.
+  // Next-event corner: icon + HH:MM right of the heart-rate slot for the
+  // sooner of the watch's alarm and the soonest Hub event (pinetime-hacks
+  // doc/DESIGN-hub.md). The heart-rate value owns the spot while it is
+  // displayed; the corner yields to it.
   const bool heartRateValueShown = heartbeatRunning.Get() && !lockedState.Get();
-  uint16_t alarmMinutes = noUpcomingAlarm;
-  if (!heartRateValueShown && alarmController.IsEnabled() && alarmController.SecondsToAlarm() <= 60 * 60 * 24) {
-    alarmMinutes = alarmController.Hours() * 60 + alarmController.Minutes();
+  std::optional<Controllers::HubService::Event> event;
+  uint32_t nowUtcSeconds = 0;
+  if (!heartRateValueShown && hubService != nullptr) {
+    nowUtcSeconds = NowUtcSeconds();
+    event = hubService->Soonest(nowUtcSeconds);
   }
-  upcomingAlarmMinutes = alarmMinutes;
-  if (upcomingAlarmMinutes.IsUpdated()) {
-    if (upcomingAlarmMinutes.Get() == noUpcomingAlarm) {
-      lv_label_set_text_static(alarmIcon, "");
-      lv_label_set_text_static(alarmValue, "");
-    } else {
-      lv_label_set_text_static(alarmIcon, Symbols::bell);
-      lv_label_set_text_fmt(alarmValue, "%02d:%02d", upcomingAlarmMinutes.Get() / 60, upcomingAlarmMinutes.Get() % 60);
-    }
-    lv_obj_realign(alarmIcon);
-    lv_obj_realign(alarmValue);
+  cornerContent = heartRateValueShown ? CornerContent {} : NextCornerContent(event, nowUtcSeconds);
+  if (cornerContent.IsUpdated()) {
+    PaintCorner(cornerContent.Get(), event);
   }
 
   stepCount = motionController.NbSteps();
@@ -379,6 +396,76 @@ void WatchFaceCasioStyleG7710::Refresh() {
     lv_obj_realign(stepValue);
     lv_obj_realign(stepIcon);
   }
+}
+
+// Each candidate counts only within the window; the sooner wins, and on a
+// tie the alarm keeps the spot.
+WatchFaceCasioStyleG7710::CornerContent
+WatchFaceCasioStyleG7710::NextCornerContent(const std::optional<Controllers::HubService::Event>& event, uint32_t nowUtcSeconds) const {
+  CornerContent content {};
+  uint32_t secondsToContent = 0;
+  if (alarmController.IsEnabled()) {
+    const uint32_t secondsToAlarm = alarmController.SecondsToAlarm();
+    if (secondsToAlarm <= cornerWindowSeconds) {
+      content = {CornerKind::Alarm, 0, static_cast<uint16_t>(alarmController.Hours() * 60 + alarmController.Minutes()), 0};
+      secondsToContent = secondsToAlarm;
+    }
+  }
+  if (!event.has_value()) {
+    return content;
+  }
+  // Soonest() returns only events after nowUtcSeconds, so this cannot wrap.
+  const uint32_t secondsToEvent = event->utcSeconds - nowUtcSeconds;
+  if (secondsToEvent <= cornerWindowSeconds && (content.kind == CornerKind::None || secondsToEvent < secondsToContent)) {
+    content = {CornerKind::Event, event->sourceId, LocalMinutesOfDay(event->utcSeconds), event->generation};
+  }
+  return content;
+}
+
+void WatchFaceCasioStyleG7710::PaintCorner(const CornerContent& content, const std::optional<Controllers::HubService::Event>& event) {
+  lv_obj_t* valueAnchor = alarmIcon;
+  if (content.kind == CornerKind::Event && event.has_value()) {
+    lv_label_set_text_static(alarmIcon, "");
+    ShowEventIcon(*event);
+    valueAnchor = eventIcon;
+  } else {
+    lv_obj_set_hidden(eventIcon, true);
+    lv_label_set_text_static(alarmIcon, content.kind == CornerKind::Alarm ? Symbols::bell : "");
+  }
+  if (content.kind == CornerKind::None) {
+    lv_label_set_text_static(alarmValue, "");
+  } else {
+    lv_label_set_text_fmt(alarmValue, "%02d:%02d", content.minutesOfDay / 60, content.minutesOfDay % 60);
+  }
+  lv_obj_realign(alarmIcon);
+  lv_obj_align(alarmValue, valueAnchor, LV_ALIGN_OUT_RIGHT_MID, 2, 0);
+}
+
+// The image cache keeps the decoded palette and size per descriptor address,
+// so the entry must go before the same descriptor shows a different icon.
+void WatchFaceCasioStyleG7710::ShowEventIcon(const Controllers::HubService::Event& event) {
+  const uint16_t bitmapSize = Controllers::HubService::BitmapSize(event.width, event.height);
+  std::memcpy(eventIconData.data() + eventIconPaletteSize, event.bitmap.data(), bitmapSize);
+  eventIconDescriptor.header.cf = LV_IMG_CF_INDEXED_1BIT;
+  eventIconDescriptor.header.w = event.width;
+  eventIconDescriptor.header.h = event.height;
+  eventIconDescriptor.data_size = eventIconPaletteSize + bitmapSize;
+  eventIconDescriptor.data = eventIconData.data();
+  lv_img_cache_invalidate_src(&eventIconDescriptor);
+  lv_img_set_src(eventIcon, &eventIconDescriptor);
+  lv_obj_set_hidden(eventIcon, false);
+  lv_obj_realign(eventIcon);
+}
+
+// 24 h local time regardless of the clock setting, like the alarm's HH:MM.
+uint16_t WatchFaceCasioStyleG7710::LocalMinutesOfDay(uint32_t utcSeconds) const {
+  const int64_t localSeconds = static_cast<int64_t>(utcSeconds) + dateTimeController.UtcOffset() * 15 * 60;
+  return static_cast<uint16_t>(localSeconds / 60 % (24 * 60));
+}
+
+uint32_t WatchFaceCasioStyleG7710::NowUtcSeconds() const {
+  return static_cast<uint32_t>(
+    std::chrono::duration_cast<std::chrono::seconds>(dateTimeController.UTCDateTime().time_since_epoch()).count());
 }
 
 bool WatchFaceCasioStyleG7710::IsAvailable(Pinetime::Controllers::FS& filesystem) {

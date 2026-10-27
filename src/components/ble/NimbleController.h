@@ -24,6 +24,7 @@
 #include "components/ble/SimpleWeatherService.h"
 #include "components/ble/ClockSyncService.h"
 #include "components/ble/KeyTonesService.h"
+#include "components/ble/HubService.h"
 #include "components/fs/FS.h"
 
 namespace Pinetime {
@@ -83,6 +84,10 @@ namespace Pinetime {
         return keyTonesService;
       };
 
+      Pinetime::Controllers::HubService& hub() {
+        return hubService;
+      };
+
       uint16_t connHandle();
       void NotifyBatteryLevel(uint8_t level);
 
@@ -120,6 +125,7 @@ namespace Pinetime {
       SimpleWeatherService weatherService;
       ClockSyncService clockSyncService;
       KeyTonesService keyTonesService;
+      HubService hubService;
       NavigationService navService;
       BatteryInformationService batteryInformationService;
       ImmediateAlertService immediateAlertService;

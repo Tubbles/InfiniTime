@@ -28,6 +28,7 @@ namespace Pinetime {
     class NavigationService;
     class ClockSyncService;
     class KeyTonesService;
+    class HubService;
     class AlertNotificationService;
   }
 
@@ -58,6 +59,7 @@ namespace Pinetime {
       Pinetime::Controllers::NavigationService* navigationService;
       Pinetime::Controllers::ClockSyncService* clockSyncService;
       Pinetime::Controllers::KeyTonesService* keyTonesService;
+      Pinetime::Controllers::HubService* hubService;
       Pinetime::Controllers::AlertNotificationService* alertService;
     };
   }

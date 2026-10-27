@@ -467,6 +467,7 @@ list(APPEND SOURCE_FILES
         components/ble/SimpleWeatherService.cpp
         components/ble/ClockSyncService.cpp
         components/ble/KeyTonesService.cpp
+        components/ble/HubService.cpp
         components/trace/Trace.cpp
         components/eventlog/EventLog.cpp
         components/ble/NavigationService.cpp
@@ -542,6 +543,7 @@ list(APPEND RECOVERY_SOURCE_FILES
         components/ble/SimpleWeatherService.cpp
         components/ble/ClockSyncService.cpp
         components/ble/KeyTonesService.cpp
+        components/ble/HubService.cpp
         components/trace/Trace.cpp
         components/eventlog/EventLog.cpp
         components/ble/BatteryInformationService.cpp

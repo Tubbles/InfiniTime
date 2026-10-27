@@ -137,6 +137,7 @@ DisplayApp::DisplayApp(Drivers::St7789& lcd,
                  nullptr,
                  nullptr,
                  nullptr,
+                 nullptr,
                  nullptr} {
   timerController.Init(this, TimerCallback);
 }
@@ -836,6 +837,10 @@ void DisplayApp::Register(Pinetime::Controllers::ClockSyncService* clockSyncServ
 
 void DisplayApp::Register(Pinetime::Controllers::KeyTonesService* keyTonesService) {
   this->controllers.keyTonesService = keyTonesService;
+}
+
+void DisplayApp::Register(Pinetime::Controllers::HubService* hubService) {
+  this->controllers.hubService = hubService;
 }
 
 void DisplayApp::Register(Pinetime::Controllers::AlertNotificationService* alertService) {

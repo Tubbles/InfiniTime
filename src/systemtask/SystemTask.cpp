@@ -171,6 +171,7 @@ void SystemTask::Work() {
   displayApp.Register(&nimbleController.navigation());
   displayApp.Register(&nimbleController.clockSync());
   displayApp.Register(&nimbleController.keyTones());
+  displayApp.Register(&nimbleController.hub());
   displayApp.Register(&nimbleController.alertService());
   displayApp.Start(bootError);
 

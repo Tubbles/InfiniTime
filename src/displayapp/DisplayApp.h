@@ -84,6 +84,7 @@ namespace Pinetime {
       void Register(Pinetime::Controllers::NavigationService* NavigationService);
       void Register(Pinetime::Controllers::ClockSyncService* clockSyncService);
       void Register(Pinetime::Controllers::KeyTonesService* keyTonesService);
+      void Register(Pinetime::Controllers::HubService* hubService);
       void Register(Pinetime::Controllers::AlertNotificationService* alertService);
 
     private:
